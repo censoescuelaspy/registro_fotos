@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#123f69">
+  <meta name="description" content="Registro fotografico del relevamiento escolar CIALPA.">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./assets/img/favicon.png" type="image/png">
+  <link rel="apple-touch-icon" href="./assets/img/icon-192.png">
+  <link rel="stylesheet" href="./assets/vendor/leaflet/leaflet.css">
+  <link rel="stylesheet" href="./assets/css/app.css">
+  <title>CIALPA Fotos</title>
+</head>
+<body>
+  <noscript>Esta aplicacion necesita JavaScript para registrar y sincronizar las fotos.</noscript>
+  <div id="app" class="app-loading" aria-live="polite">
+    <div class="boot-screen">
+      <img src="./assets/img/logo.png" alt="CIALPA" width="112" height="56">
+      <div class="spinner" aria-hidden="true"></div>
+      <p>Preparando registro...</p>
+    </div>
+  </div>
+  <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
+  <script src="./assets/vendor/leaflet/leaflet.js"></script>
+  <script src="./assets/vendor/lucide/lucide.min.js"></script>
+  <script type="module" src="./assets/js/app.js"></script>
+</body>
+</html>

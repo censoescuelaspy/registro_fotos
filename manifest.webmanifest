@@ -1,0 +1,26 @@
+{
+  "name": "CIALPA - Registro de fotos",
+  "short_name": "CIALPA Fotos",
+  "description": "Registro fotografico vinculado a fichas de relevamiento escolar.",
+  "id": "/registro_fotos/",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f7fb",
+  "theme_color": "#123f69",
+  "icons": [
+    {
+      "src": "./assets/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

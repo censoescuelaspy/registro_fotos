@@ -68,3 +68,34 @@ Crear una PWA separada para capturar y organizar fotografias del piloto CIALPA, 
 ### Seguridad
 
 La hoja y la carpeta de fotos deben ser privadas. Debe eliminarse cualquier permiso de edicion abierto por enlace antes del uso operativo.
+
+## 2026-07-18 - Operacion y logistica v1.1.0
+
+### Objetivo
+
+Recuperar para la app fotografica las capacidades operativas valiosas de la app CIALPA original, adaptadas al registro manual y sin incorporar modulos ajenos a este flujo.
+
+### Implementado
+
+- **Mi jornada** con avance personal, proxima escuela por orden o cercania, borradores, cola y registros sincronizados.
+- **Control** con indicadores generales, avance por censista y registros recientes.
+- **Encuestadores** como vista independiente con filtros, alta, edicion, activacion, desactivacion y cuenta administrativa principal protegida.
+- **Logistica** con filtros territoriales, carga por censista, estimacion de tiempo, balanceo de pendientes, rutas Google Maps, borrador de cambios, deshacer y CSV.
+- **Solicitudes** como bandeja separada por estado, con aprobacion o rechazo administrativo.
+- Guardado GAS por lote con una asignacion activa por escuela e historial anterior conservado como inactivo.
+- Navegacion administrativa completa en escritorio y pestañas desplazables dentro de **Control** en celular.
+- Estados activos con cambio visible de color y filas logisticas modificadas claramente identificadas.
+- Destruccion segura del mapa Leaflet al cambiar rapidamente de modulo, sin errores de animacion pendientes.
+
+### Validacion
+
+- Sintaxis aprobada para 14 modulos JavaScript de frontend/GAS, service worker y pruebas.
+- Playwright: 22/22 recorridos aprobados en Chrome de escritorio y Pixel 7.
+- La suite cubre mapa, camara, pie fotografico, reapertura, jornada, control, usuarios, logistica, CSV, solicitudes, puente GAS, navegacion completa, consola y desborde horizontal.
+- Inspeccion visual de Logistica en escritorio y Encuestadores en celular sin solapamientos incoherentes.
+
+### Backend
+
+- GAS publicado sobre el mismo enlace estable, deployment `@13`.
+- Verificacion HTTP: `ok: true`, version `1.1.0`, esquema `2026-07-18.1` y `bootstrapRequired: false`.
+- No se modificaron asignaciones ni registros reales durante las pruebas automatizadas.

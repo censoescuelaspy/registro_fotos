@@ -3,11 +3,24 @@ import { ApiClient, ApiError, getDeviceId } from './api.js';
 import { LocalDatabase } from './db.js';
 import { blobToBase64, captureLocation, prepareImage } from './image.js';
 import { SchoolMap } from './map.js';
+import {
+  balancePendingAssignments,
+  buildWorkloads,
+  changedAssignmentItems,
+  filterLogisticsSchools,
+  googleRouteUrl,
+  logisticsCsv,
+  logisticsMetrics,
+  primaryAssignmentMap,
+  schoolStatus
+} from './operations.js';
 
 const app = document.querySelector('#app');
 const toastRegion = document.querySelector('#toast-region');
 const api = new ApiClient();
 const database = new LocalDatabase();
+const operationsViews = new Set(['admin', 'surveyors', 'logistics', 'requests']);
+const savedPlanningSettings = loadJson('cialpa-fotos-planning-settings-v1') || {};
 
 const state = {
   catalog: [],
@@ -26,6 +39,21 @@ const state = {
   remote: { records: [], photos: [] },
   admin: null,
   adminLoading: false,
+  adminFilters: {
+    surveyorSearch: '', surveyorRole: '', surveyorStatus: '',
+    logisticsSearch: '', logisticsDepartment: '', logisticsDistrict: '',
+    logisticsStatus: '', logisticsSurveyor: '', requestStatus: 'PENDIENTE'
+  },
+  editingUserCode: '',
+  logisticsOriginal: {},
+  logisticsDraft: {},
+  logisticsInitialized: false,
+  logisticsSaving: false,
+  planningSettings: {
+    baseMinutes: Number(savedPlanningSettings.baseMinutes || 45),
+    hoursPerDay: Number(savedPlanningSettings.hoursPerDay || 6),
+    targetDays: Number(savedPlanningSettings.targetDays || 10)
+  },
   syncing: false,
   installPrompt: null,
   online: navigator.onLine
@@ -249,8 +277,20 @@ function renderShell() {
   const navItems = [
     ['schools', 'map', 'Escuelas'],
     ['register', 'camera', 'Registrar'],
-    ['pending', 'clipboard-list', 'Mi trabajo'],
-    ...(canAdmin ? [['admin', 'users', 'Administrar']] : []),
+    ['pending', 'clipboard-list', 'Mi jornada'],
+    ...(canAdmin ? [
+      ['admin', 'layout-dashboard', 'Control'],
+      ['surveyors', 'users', 'Encuestadores'],
+      ['logistics', 'route', 'Logistica'],
+      ['requests', 'inbox', 'Solicitudes']
+    ] : []),
+    ['account', 'circle-user-round', 'Cuenta']
+  ];
+  const mobileNavItems = [
+    ['schools', 'map', 'Escuelas'],
+    ['register', 'camera', 'Registrar'],
+    ['pending', 'clipboard-list', 'Jornada'],
+    ...(canAdmin ? [['admin', 'layout-dashboard', 'Control']] : []),
     ['account', 'circle-user-round', 'Cuenta']
   ];
   return `<header class="topbar">
@@ -279,15 +319,19 @@ function renderShell() {
     </aside>
     <main class="main-content" id="main-content">${renderCurrentView()}</main>
     <nav class="bottom-nav" aria-label="Navegacion movil">
-      ${navItems.map(([view, iconName, label]) => navButton(view, iconName, label, true)).join('')}
+      ${mobileNavItems.map(([view, iconName, label]) => navButton(
+        view, iconName, label, true, view === 'admin' && operationsViews.has(state.view)
+      )).join('')}
     </nav>`;
 }
 
-function navButton(view, iconName, label, mobile = false) {
-  const active = state.view === view;
+function navButton(view, iconName, label, mobile = false, activeOverride = false) {
+  const active = state.view === view || activeOverride;
+  const badge = view === 'pending' ? state.queue.length
+    : view === 'requests' ? Number(state.admin?.counts?.solicitudesPendientes || 0) : 0;
   return `<button data-view="${view}" class="nav-button ${active ? 'is-active' : ''}" ${active ? 'aria-current="page"' : ''}>
     ${icon(iconName, mobile ? 20 : 18)}<span>${label}</span>
-    ${view === 'pending' && state.queue.length ? `<b>${state.queue.length}</b>` : ''}
+    ${badge ? `<b>${badge}</b>` : ''}
   </button>`;
 }
 
@@ -295,6 +339,9 @@ function renderCurrentView() {
   if (state.view === 'register') return renderRegister();
   if (state.view === 'pending') return renderPending();
   if (state.view === 'admin') return renderAdmin();
+  if (state.view === 'surveyors') return renderSurveyors();
+  if (state.view === 'logistics') return renderLogistics();
+  if (state.view === 'requests') return renderRequests();
   if (state.view === 'account') return renderAccount();
   return renderSchools();
 }
@@ -505,14 +552,30 @@ function renderPhotoItem(photo, index) {
 
 function renderPending() {
   const remoteRecords = state.remote?.records || [];
+  const schools = availableSchools();
+  const progress = state.bootstrap?.progress || {};
+  const finalizadas = schools.filter((school) => schoolStatus(progress, school.codigo) === 'FINALIZADO').length;
+  const enProceso = schools.filter((school) => ['EN_PROCESO', 'CON_PENDIENTES'].includes(schoolStatus(progress, school.codigo))).length;
+  const pendientes = schools.length - finalizadas - enProceso;
+  const candidates = schools
+    .filter((school) => schoolStatus(progress, school.codigo) !== 'FINALIZADO')
+    .map((school) => state.location ? { ...school, distanceKm: distanceKm(state.location, school) } : school)
+    .sort((left, right) => state.location
+      ? left.distanceKm - right.distanceKm
+      : Number(left.ordenMuestra || 0) - Number(right.ordenMuestra || 0));
+  const nextSchool = candidates[0] || null;
   return `<section class="view">
-    <div class="view-heading"><div><p class="eyebrow">Continuidad de campo</p><h1>Mi trabajo</h1><p>${remoteRecords.length} registros sincronizados · ${state.drafts.length} borradores · ${state.queue.length} operaciones en cola</p></div><div class="button-row"><button class="btn btn-secondary" data-action="reload-records">${icon('rotate-cw')} Actualizar</button><button class="btn btn-primary" data-action="sync" ${!state.queue.length || state.syncing ? 'disabled' : ''}>${icon('refresh-cw')} ${state.syncing ? 'Sincronizando...' : 'Sincronizar ahora'}</button></div></div>
+    <div class="view-heading"><div><p class="eyebrow">Trabajo de campo</p><h1>Mi jornada</h1><p>${schools.length} escuelas asignadas · ${remoteRecords.length} registros sincronizados · ${state.queue.length} operaciones en cola</p></div><div class="button-row"><button class="btn btn-secondary" data-action="locate-journal">${icon('locate-fixed')} Ordenar por cercania</button><button class="btn btn-secondary" data-action="reload-records">${icon('rotate-cw')} Actualizar</button><button class="btn btn-primary" data-action="sync" ${!state.queue.length || state.syncing ? 'disabled' : ''}>${icon('refresh-cw')} ${state.syncing ? 'Sincronizando...' : 'Sincronizar ahora'}</button></div></div>
     <div class="summary-strip">
-      <div><span>Borradores</span><strong>${state.drafts.length}</strong></div>
-      <div><span>Registros en cola</span><strong>${state.queue.filter((item) => item.action === 'saveRecord').length}</strong></div>
-      <div><span>Fotos en cola</span><strong>${state.queue.filter((item) => item.action === 'uploadPhoto').length}</strong></div>
-      <div><span>Con error</span><strong>${state.queue.filter((item) => item.lastError).length}</strong></div>
+      <div><span>Asignadas</span><strong>${schools.length}</strong></div>
+      <div><span>Finalizadas</span><strong>${finalizadas}</strong></div>
+      <div><span>En proceso</span><strong>${enProceso}</strong></div>
+      <div><span>Pendientes</span><strong>${pendientes}</strong></div>
     </div>
+    <section class="content-section next-school-section">
+      <div class="section-heading"><div><h2>Proxima escuela</h2><p>${state.location ? 'Sugerida por cercania a su ubicacion actual.' : 'Sugerida segun el orden de la muestra.'}</p></div></div>
+      ${nextSchool ? `<article class="next-school-card"><div class="list-card-icon">${icon('school')}</div><div><span class="status-pill status-${schoolStatus(progress, nextSchool.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, nextSchool.codigo))}</span><h3>${escapeHtml(nextSchool.nombre)}</h3><p><strong>${escapeHtml(nextSchool.codigo)}</strong> · ${escapeHtml(nextSchool.distrito)} · ${escapeHtml(nextSchool.localidad)}${Number.isFinite(nextSchool.distanceKm) ? ` · ${nextSchool.distanceKm < 1 ? `${Math.round(nextSchool.distanceKm * 1000)} m` : `${nextSchool.distanceKm.toFixed(1)} km`}` : ''}</p></div><div class="button-row"><button class="btn btn-primary" data-action="start-record" data-school="${nextSchool.codigo}">${icon('camera')} Registrar</button><button class="btn btn-secondary" data-action="show-school" data-school="${nextSchool.codigo}">${icon('map')} Ver en mapa</button><a class="icon-btn" href="https://www.google.com/maps/dir/?api=1&destination=${nextSchool.latitud},${nextSchool.longitud}" target="_blank" rel="noopener" title="Abrir ruta en Google Maps" aria-label="Abrir ruta en Google Maps">${icon('navigation')}</a></div></article>` : renderEmpty('badge-check', 'Jornada completada.', 'No quedan escuelas pendientes en sus asignaciones.')}
+    </section>
     <section class="content-section">
       <div class="section-heading"><div><h2>Borradores locales</h2><p>Registros que todavia pueden modificarse.</p></div></div>
       <div class="draft-list">${state.drafts.length ? state.drafts.map(renderDraftRow).join('') : renderEmpty('file-check-2', 'No hay borradores.', 'Los registros incompletos apareceran aqui.')}</div>
@@ -545,46 +608,185 @@ function renderSyncedRecordRow(record) {
   return `<article class="list-card"><div class="list-card-icon">${icon('cloud-check')}</div><div><strong>${escapeHtml(record.recordId)}</strong><span>${escapeHtml(school?.nombre || record.codigoEscuela)} · ${record.cantidadFotos || 0} fotos</span><small>${statusLabel(record.estado)} · ${formatDateTime(record.updatedAt || record.syncedAt)}</small></div>${own ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="continue-record" data-record="${escapeHtml(record.recordKey)}">${icon('pencil')} Continuar</button></div>` : ''}</article>`;
 }
 
+function operationsAllowed() {
+  return ['ADMIN', 'SUPERVISOR'].includes((state.bootstrap?.user || {}).rol);
+}
+
+function renderOperationsGuard() {
+  return `<section class="view">${renderEmpty('shield-alert', 'Acceso restringido.', 'Esta vista requiere rol de supervision o administracion.')}</section>`;
+}
+
+function renderOperationsLoading(title) {
+  return `<section class="view"><div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>${escapeHtml(title)}</h1></div></div>${renderAdminTabs(state.view)}<div class="loading-panel"><div class="spinner"></div><p>Cargando datos operativos...</p></div></section>`;
+}
+
+function renderAdminTabs(activeView) {
+  const tabs = [
+    ['admin', 'layout-dashboard', 'Resumen'],
+    ['surveyors', 'users', 'Encuestadores'],
+    ['logistics', 'route', 'Logistica'],
+    ['requests', 'inbox', 'Solicitudes']
+  ];
+  const pending = Number(state.admin?.counts?.solicitudesPendientes || 0);
+  return `<nav class="operations-tabs" aria-label="Modulos de control">${tabs.map(([view, iconName, label]) => `<button class="operations-tab ${activeView === view ? 'is-active' : ''}" data-view="${view}" ${activeView === view ? 'aria-current="page"' : ''}>${icon(iconName, 17)}<span>${label}</span>${view === 'requests' && pending ? `<b>${pending}</b>` : ''}</button>`).join('')}</nav>`;
+}
+
 function renderAdmin() {
-  const user = state.bootstrap?.user || {};
-  if (!['ADMIN', 'SUPERVISOR'].includes(user.rol)) return renderEmpty('shield-alert', 'Acceso restringido.', 'Esta vista requiere rol de supervision o administracion.');
-  if (!state.admin) return `<section class="view"><div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>Administracion</h1></div></div><div class="loading-panel"><div class="spinner"></div><p>Cargando avance y asignaciones...</p></div></section>`;
+  if (!operationsAllowed()) return renderOperationsGuard();
+  if (!state.admin) return renderOperationsLoading('Control');
   const counts = state.admin.counts || {};
-  return `<section class="view">
-    <div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>Administracion</h1><p>Usuarios, asignaciones y avance del relevamiento fotografico.</p></div><div class="button-row">${state.admin.photoRootUrl ? `<a class="btn btn-secondary" href="${escapeHtml(state.admin.photoRootUrl)}" target="_blank" rel="noopener">${icon('folder-open')} Abrir fotos</a>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
+  const progress = state.bootstrap?.progress || {};
+  const completedSchools = state.catalog.filter((school) => schoolStatus(progress, school.codigo) === 'FINALIZADO').length;
+  return `<section class="view operations-view">
+    <div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>Resumen general</h1><p>Avance consolidado del relevamiento fotografico.</p></div><div class="button-row">${state.admin.photoRootUrl ? `<a class="btn btn-secondary" href="${escapeHtml(state.admin.photoRootUrl)}" target="_blank" rel="noopener">${icon('folder-open')} Abrir fotos</a>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
+    ${renderAdminTabs('admin')}
     <div class="summary-strip admin-summary">
-      <div><span>Usuarios</span><strong>${counts.usuarios || 0}</strong></div><div><span>Asignaciones</span><strong>${counts.asignaciones || 0}</strong></div><div><span>Registros</span><strong>${counts.registros || 0}</strong></div><div><span>Fotos</span><strong>${counts.fotos || 0}</strong></div><div><span>Solicitudes</span><strong>${counts.solicitudesPendientes || 0}</strong></div>
+      <div><span>Escuelas finalizadas</span><strong>${completedSchools}/${state.catalog.length}</strong></div>
+      <div><span>Encuestadores activos</span><strong>${(state.admin.users || []).filter((item) => item.activo && item.rol === 'ENCUESTADOR').length}</strong></div>
+      <div><span>Registros</span><strong>${counts.registros || 0}</strong></div>
+      <div><span>Fotos</span><strong>${counts.fotos || 0}</strong></div>
+      <div><span>Solicitudes pendientes</span><strong>${counts.solicitudesPendientes || 0}</strong></div>
     </div>
-    <section class="content-section"><div class="section-heading"><div><h2>Avance por censista</h2><p>Resumen ordenado por cantidad de registros recibidos.</p></div></div>
-      <div class="data-table-wrap"><table><thead><tr><th>Censista</th><th>Escuelas</th><th>Registros</th><th>Finalizados</th><th>Con pendientes</th><th>Fotos</th><th>Ultima carga</th></tr></thead><tbody>${(state.admin.surveyorSummary || []).map((item) => `<tr><td><strong>${escapeHtml(item.nombres)} ${escapeHtml(item.apellidos)}</strong><br><small>${escapeHtml(item.codigoCensista)}</small></td><td>${item.escuelasAsignadas || 0}</td><td>${item.registros || 0}</td><td>${item.finalizados || 0}</td><td>${item.conPendientes || 0}</td><td>${item.fotos || 0}</td><td>${formatDateTime(item.ultimaCarga)}</td></tr>`).join('') || '<tr><td colspan="7">Aun no hay usuarios.</td></tr>'}</tbody></table></div>
+    <section class="content-section"><div class="section-heading"><div><h2>Avance por censista</h2><p>Carga recibida y escuelas asignadas.</p></div><button class="btn btn-secondary" data-view="surveyors">${icon('users')} Administrar</button></div>
+      <div class="data-table-wrap"><table><thead><tr><th>Censista</th><th>Escuelas</th><th>Registros</th><th>Finalizados</th><th>Con pendientes</th><th>Fotos</th><th>Ultima carga</th></tr></thead><tbody>${(state.admin.surveyorSummary || []).filter((item) => item.rol !== 'ADMIN').map((item) => `<tr><td><strong>${escapeHtml(displayName(item))}</strong><br><small>${escapeHtml(item.codigoCensista)}</small></td><td>${item.escuelasAsignadas || 0}</td><td>${item.registros || 0}</td><td>${item.finalizados || 0}</td><td>${item.conPendientes || 0}</td><td>${item.fotos || 0}</td><td>${formatDateTime(item.ultimaCarga)}</td></tr>`).join('') || '<tr><td colspan="7">Aun no hay censistas registrados.</td></tr>'}</tbody></table></div>
     </section>
-    <div class="admin-grid">
-      ${user.rol === 'ADMIN' ? `<section class="content-section"><div class="section-heading"><div><h2>Encuestadores</h2><p>El codigo es el numero de cedula.</p></div></div>
-        <form data-form="save-user" class="form-grid two-cols compact-form">
-          <label>Codigo / cedula<input name="codigoCensista" inputmode="numeric" required maxlength="12"></label>
-          <label>PIN inicial<input name="pin" type="password" inputmode="numeric" minlength="4" maxlength="12" required></label>
-          <label>Nombres<input name="nombres" required maxlength="80"></label><label>Apellidos<input name="apellidos" required maxlength="80"></label>
-          <label>Rol<select name="rol"><option>ENCUESTADOR</option><option>SUPERVISOR</option><option>ADMIN</option></select></label>
-          <label class="checkbox-label"><input name="activo" type="checkbox" checked> Usuario activo</label>
-          <button class="btn btn-primary full-row" type="submit">${icon('user-plus')} Guardar usuario</button>
-        </form>
-        <div class="mini-table">${(state.admin.users || []).map((item) => `<div><span class="avatar small">${escapeHtml(initials(item))}</span><span><strong>${escapeHtml(displayName(item))}</strong><small>${escapeHtml(item.codigoCensista)} · ${roleLabel(item.rol)}</small></span><b class="status-pill ${item.activo ? 'status-finalizado' : 'status-pendiente'}">${item.activo ? 'Activo' : 'Inactivo'}</b></div>`).join('')}</div>
-      </section>` : ''}
-      <section class="content-section"><div class="section-heading"><div><h2>Asignar escuela</h2><p>Una escuela puede asignarse a mas de un censista.</p></div></div>
-        <form data-form="save-assignment" class="form-grid compact-form">
-          <label>Encuestador<select name="codigoCensista" required><option value="">Seleccione...</option>${(state.admin.users || []).filter((item) => item.activo).map((item) => `<option value="${item.codigoCensista}">${escapeHtml(displayName(item))} · ${escapeHtml(item.codigoCensista)}</option>`).join('')}</select></label>
-          <label>Escuela<select name="codigoEscuela" required><option value="">Seleccione...</option>${state.catalog.map((school) => `<option value="${school.codigo}">${escapeHtml(school.codigo)} · ${escapeHtml(school.nombre)}</option>`).join('')}</select></label>
-          <label class="checkbox-label"><input name="activo" type="checkbox" checked> Asignacion activa</label>
-          <button class="btn btn-primary" type="submit">${icon('link')} Guardar asignacion</button>
-        </form>
-        <div class="mini-table assignments">${(state.admin.assignments || []).slice(-30).reverse().map((item) => `<div><span>${icon('school')}</span><span><strong>${escapeHtml(item.codigoEscuela)}</strong><small>${escapeHtml(item.codigoCensista)}</small></span><b class="status-pill ${item.activo ? 'status-finalizado' : 'status-pendiente'}">${item.activo ? 'Activa' : 'Inactiva'}</b></div>`).join('') || '<p class="table-empty">Sin asignaciones.</p>'}</div>
-      </section>
+    <section class="content-section"><div class="section-heading"><div><h2>Registros recientes</h2><p>Ultimas cargas de todos los usuarios.</p></div></div>
+      <div class="data-table-wrap"><table><thead><tr><th>Registro</th><th>Escuela</th><th>Censista</th><th>Estado</th><th>Fotos</th><th>Actualizacion</th></tr></thead><tbody>${(state.admin.records || []).slice(0, 50).map((record) => `<tr><td><strong>${escapeHtml(record.recordId)}</strong></td><td>${escapeHtml(record.codigoEscuela)}</td><td>${escapeHtml(record.codigoCensista)}</td><td><span class="status-pill status-${String(record.estado || 'PENDIENTE').toLowerCase()}">${statusLabel(record.estado)}</span></td><td>${record.cantidadFotos || 0}</td><td>${formatDateTime(record.updatedAt || record.syncedAt)}</td></tr>`).join('') || '<tr><td colspan="6">Aun no hay registros.</td></tr>'}</tbody></table></div>
+    </section>
+  </section>`;
+}
+
+function renderSurveyors() {
+  if (!operationsAllowed()) return renderOperationsGuard();
+  if (!state.admin) return renderOperationsLoading('Encuestadores');
+  const currentUser = state.bootstrap?.user || {};
+  const users = state.admin.users || [];
+  const summaries = new Map((state.admin.surveyorSummary || []).map((item) => [String(item.codigoCensista), item]));
+  const search = state.adminFilters.surveyorSearch.trim().toLocaleLowerCase('es');
+  const filtered = users.filter((item) => {
+    const haystack = `${item.codigoCensista} ${item.nombres} ${item.apellidos} ${item.telefono}`.toLocaleLowerCase('es');
+    return (!search || haystack.includes(search))
+      && (!state.adminFilters.surveyorRole || item.rol === state.adminFilters.surveyorRole)
+      && (!state.adminFilters.surveyorStatus || (state.adminFilters.surveyorStatus === 'ACTIVO') === Boolean(item.activo));
+  });
+  const editing = users.find((item) => String(item.codigoCensista) === state.editingUserCode) || null;
+  const activeSurveyors = users.filter((item) => item.activo && item.rol === 'ENCUESTADOR').length;
+  return `<section class="view operations-view">
+    <div class="view-heading"><div><p class="eyebrow">Equipo de campo</p><h1>Administrar encuestadores</h1><p>${filtered.length} usuarios visibles de ${users.length}.</p></div><div class="button-row">${currentUser.rol === 'ADMIN' ? `<button class="btn btn-primary" data-action="new-user">${icon('user-plus')} Nuevo encuestador</button>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
+    ${renderAdminTabs('surveyors')}
+    <div class="summary-strip">
+      <div><span>Total de usuarios</span><strong>${users.length}</strong></div>
+      <div><span>Encuestadores activos</span><strong>${activeSurveyors}</strong></div>
+      <div><span>Supervisores activos</span><strong>${users.filter((item) => item.activo && item.rol === 'SUPERVISOR').length}</strong></div>
+      <div><span>Inactivos</span><strong>${users.filter((item) => !item.activo).length}</strong></div>
     </div>
-    <section class="content-section"><div class="section-heading"><div><h2>Solicitudes de acceso</h2><p>Revise identidad antes de habilitar un usuario.</p></div></div>
-      <div class="request-list">${(state.admin.requests || []).filter((item) => item.estado === 'PENDIENTE').map((item) => `<article class="list-card"><div class="list-card-icon">${icon('user-round-search')}</div><div><strong>${escapeHtml(item.nombres)} ${escapeHtml(item.apellidos)}</strong><span>${escapeHtml(item.codigoCensista)} · ${escapeHtml(item.telefono || 'Sin telefono')}</span><small>${formatDateTime(item.requestedAt)}</small></div>${user.rol === 'ADMIN' ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="review-access" data-request="${item.solicitudId}" data-status="RECHAZADA">Rechazar</button><button class="btn btn-primary" data-action="review-access" data-request="${item.solicitudId}" data-status="APROBADA">Aprobar</button></div>` : '<span class="status-pill status-pendiente">Requiere administrador</span>'}</article>`).join('') || renderEmpty('inbox', 'No hay solicitudes pendientes.', '')}</div>
+    ${currentUser.rol === 'ADMIN' ? renderUserEditor(editing) : ''}
+    <section class="content-section"><div class="operations-filters">
+      <label class="search-field">${icon('search')}<input data-admin-filter="surveyorSearch" value="${escapeHtml(state.adminFilters.surveyorSearch)}" placeholder="Cedula, nombre o telefono..."></label>
+      <select data-admin-filter="surveyorRole" aria-label="Filtrar por rol"><option value="">Todos los roles</option>${['ENCUESTADOR', 'SUPERVISOR', 'ADMIN'].map((role) => `<option value="${role}" ${state.adminFilters.surveyorRole === role ? 'selected' : ''}>${roleLabel(role)}</option>`).join('')}</select>
+      <select data-admin-filter="surveyorStatus" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="ACTIVO" ${state.adminFilters.surveyorStatus === 'ACTIVO' ? 'selected' : ''}>Activos</option><option value="INACTIVO" ${state.adminFilters.surveyorStatus === 'INACTIVO' ? 'selected' : ''}>Inactivos</option></select>
+    </div>
+    <div class="data-table-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Escuelas</th><th>Registros</th><th>Fotos</th><th>Ultimo acceso</th><th>Acciones</th></tr></thead><tbody>${filtered.map((item) => {
+      const summary = summaries.get(String(item.codigoCensista)) || {};
+      const protectedAdmin = item.codigoCensista === 'admin'
+        || (item.rol === 'ADMIN' && item.codigoCensista === currentUser.codigoCensista);
+      return `<tr><td><span class="table-user"><span class="avatar small">${escapeHtml(initials(item))}</span><span><strong>${escapeHtml(displayName(item))}</strong><small>${escapeHtml(item.codigoCensista)}${item.telefono ? ` · ${escapeHtml(item.telefono)}` : ''}</small></span></span></td><td>${roleLabel(item.rol)}</td><td><span class="status-pill ${item.activo ? 'status-finalizado' : 'status-pendiente'}">${item.activo ? 'Activo' : 'Inactivo'}</span></td><td>${summary.escuelasAsignadas || 0}</td><td>${summary.registros || 0}</td><td>${summary.fotos || 0}</td><td>${formatDateTime(item.ultimoAcceso)}</td><td><div class="table-actions">${currentUser.rol === 'ADMIN' && !protectedAdmin ? `<button class="icon-btn" data-action="edit-user" data-user="${escapeHtml(item.codigoCensista)}" title="Editar usuario" aria-label="Editar ${escapeHtml(displayName(item))}">${icon('pencil')}</button><button class="icon-btn ${item.activo ? 'danger' : ''}" data-action="toggle-user" data-user="${escapeHtml(item.codigoCensista)}" data-active="${item.activo ? 'false' : 'true'}" title="${item.activo ? 'Desactivar' : 'Activar'} usuario" aria-label="${item.activo ? 'Desactivar' : 'Activar'} ${escapeHtml(displayName(item))}">${icon(item.activo ? 'user-x' : 'user-check')}</button>` : `<span class="protected-label">${protectedAdmin ? `${icon('lock-keyhole', 14)} Protegido` : 'Solo lectura'}</span>`}</div></td></tr>`;
+    }).join('') || '<tr><td colspan="8">No hay usuarios con estos filtros.</td></tr>'}</tbody></table></div>
     </section>
-    <section class="content-section"><div class="section-heading"><div><h2>Registros recientes</h2><p>Ultimas cargas recibidas de todos los usuarios autorizados.</p></div></div>
-      <div class="data-table-wrap"><table><thead><tr><th>Registro</th><th>Escuela</th><th>Censista</th><th>Estado</th><th>Fotos</th><th>Actualizacion</th></tr></thead><tbody>${(state.admin.records || []).map((record) => `<tr><td><strong>${escapeHtml(record.recordId)}</strong></td><td>${escapeHtml(record.codigoEscuela)}</td><td>${escapeHtml(record.codigoCensista)}</td><td><span class="status-pill status-${String(record.estado || 'PENDIENTE').toLowerCase()}">${statusLabel(record.estado)}</span></td><td>${record.cantidadFotos || 0}</td><td>${formatDateTime(record.updatedAt || record.syncedAt)}</td></tr>`).join('') || '<tr><td colspan="6">Aun no hay registros.</td></tr>'}</tbody></table></div>
+  </section>`;
+}
+
+function renderUserEditor(editing) {
+  const user = editing || { codigoCensista: '', nombres: '', apellidos: '', telefono: '', rol: 'ENCUESTADOR', activo: true };
+  return `<section class="content-section user-editor" id="user-editor"><div class="section-heading"><div><h2>${editing ? 'Editar usuario' : 'Nuevo encuestador'}</h2><p>El codigo del censista corresponde a su numero de cedula.</p></div>${editing ? `<button class="icon-btn" data-action="cancel-user-edit" title="Cancelar edicion" aria-label="Cancelar edicion">${icon('x')}</button>` : ''}</div>
+    <form data-form="save-user" class="form-grid user-form">
+      <label>Codigo / cedula<input name="codigoCensista" value="${escapeHtml(user.codigoCensista)}" inputmode="numeric" required minlength="5" maxlength="12" ${editing ? 'readonly' : ''}></label>
+      <label>Nombres<input name="nombres" value="${escapeHtml(user.nombres)}" required maxlength="80"></label>
+      <label>Apellidos<input name="apellidos" value="${escapeHtml(user.apellidos)}" required maxlength="80"></label>
+      <label>Telefono<input name="telefono" value="${escapeHtml(user.telefono || '')}" inputmode="tel" maxlength="30"></label>
+      <label>${editing ? 'Nuevo PIN (opcional)' : 'PIN inicial'}<input name="pin" type="password" inputmode="numeric" minlength="4" maxlength="12" ${editing ? '' : 'required'}></label>
+      <label>Rol<select name="rol">${['ENCUESTADOR', 'SUPERVISOR', 'ADMIN'].map((role) => `<option value="${role}" ${user.rol === role ? 'selected' : ''}>${roleLabel(role)}</option>`).join('')}</select></label>
+      <label class="checkbox-label"><input name="activo" type="checkbox" ${user.activo !== false ? 'checked' : ''}> Usuario activo</label>
+      <button class="btn btn-primary" type="submit">${icon(editing ? 'save' : 'user-plus')} ${editing ? 'Guardar cambios' : 'Crear usuario'}</button>
+    </form>
+  </section>`;
+}
+
+function renderLogistics() {
+  if (!operationsAllowed()) return renderOperationsGuard();
+  if (!state.admin) return renderOperationsLoading('Logistica');
+  const users = state.admin.users || [];
+  const progress = state.bootstrap?.progress || {};
+  const assignments = state.logisticsDraft || {};
+  const fieldUsers = users.filter((item) => item.activo && item.rol !== 'ADMIN');
+  const changed = changedAssignmentItems(state.logisticsOriginal, assignments, state.catalog);
+  const metrics = logisticsMetrics(state.catalog, users, assignments, progress, state.planningSettings);
+  const workloads = buildWorkloads(users, state.catalog, assignments, progress, state.admin.surveyorSummary || []);
+  const departments = [...new Set(state.catalog.map((school) => school.departamento))].sort();
+  const districts = [...new Set(state.catalog
+    .filter((school) => !state.adminFilters.logisticsDepartment || school.departamento === state.adminFilters.logisticsDepartment)
+    .map((school) => school.distrito))].sort();
+  const filtered = filterLogisticsSchools(state.catalog, progress, assignments, {
+    search: state.adminFilters.logisticsSearch,
+    department: state.adminFilters.logisticsDepartment,
+    district: state.adminFilters.logisticsDistrict,
+    status: state.adminFilters.logisticsStatus,
+    surveyor: state.adminFilters.logisticsSurveyor
+  });
+  const maxLoad = Math.max(1, ...workloads.map((item) => item.asignadas));
+  return `<section class="view operations-view logistics-view">
+    <div class="view-heading"><div><p class="eyebrow">Planificacion territorial</p><h1>Logistica de campo</h1><p>${filtered.length} escuelas visibles de ${state.catalog.length}.</p></div><div class="button-row"><button class="btn btn-secondary" data-action="export-logistics">${icon('download')} CSV</button><button class="btn btn-secondary" data-action="undo-logistics" ${changed.length ? '' : 'disabled'}>${icon('undo-2')} Deshacer</button><button class="btn btn-primary" data-action="save-logistics" ${changed.length && !state.logisticsSaving ? '' : 'disabled'}>${icon('save')} ${state.logisticsSaving ? 'Guardando...' : `Guardar ${changed.length || ''} cambio${changed.length === 1 ? '' : 's'}`}</button></div></div>
+    ${renderAdminTabs('logistics')}
+    <div class="planning-band">
+      <label>Minutos por escuela<input type="number" min="5" max="1440" step="5" data-planning-setting="baseMinutes" value="${state.planningSettings.baseMinutes}"></label>
+      <label>Horas de campo por dia<input type="number" min="1" max="24" step="0.5" data-planning-setting="hoursPerDay" value="${state.planningSettings.hoursPerDay}"></label>
+      <label>Plazo objetivo en dias<input type="number" min="1" max="365" step="1" data-planning-setting="targetDays" value="${state.planningSettings.targetDays}"></label>
+      <button class="btn btn-secondary" data-action="balance-logistics" ${fieldUsers.some((item) => item.rol === 'ENCUESTADOR') ? '' : 'disabled'}>${icon('scale')} Balancear pendientes</button>
+    </div>
+    <div class="summary-strip admin-summary logistics-summary">
+      <div><span>Escuelas</span><strong>${metrics.total}</strong></div><div><span>Pendientes</span><strong>${metrics.pendientes}</strong></div><div><span>Sin asignar</span><strong>${metrics.sinAsignar}</strong></div><div><span>Horas restantes</span><strong>${formatNumber(metrics.horasPendientes, 1)}</strong></div><div><span>Dias estimados</span><strong>${metrics.diasCalendario ?? '—'}</strong></div>
+    </div>
+    ${changed.length ? `<div class="dirty-banner">${icon('circle-dot')}<span><strong>${changed.length} cambio${changed.length === 1 ? '' : 's'} sin guardar.</strong> La hoja en linea aun no fue modificada.</span></div>` : ''}
+    <section class="content-section"><div class="section-heading"><div><h2>Carga por encuestador</h2><p>${metrics.encuestadoresActivos} activos · ${metrics.encuestadoresNecesarios} necesarios para el plazo indicado · ${formatNumber(metrics.jornadasPersona, 1)} jornadas-persona.</p></div></div>
+      <div class="workload-grid">${workloads.map((item) => {
+        const assignedSchools = state.catalog.filter((school) => assignments[school.codigo] === item.codigoCensista && schoolStatus(progress, school.codigo) !== 'FINALIZADO');
+        const routeUrl = googleRouteUrl(assignedSchools);
+        return `<article class="workload-row"><span class="avatar small">${escapeHtml(initials(item))}</span><div><strong>${escapeHtml(displayName(item))}</strong><small>${item.finalizadas} finalizadas · ${item.pendientes} pendientes · ${item.fotos} fotos</small><span class="workload-track"><i style="width:${Math.round(item.asignadas / maxLoad * 100)}%"></i></span></div><b>${item.asignadas}</b>${routeUrl ? `<a class="icon-btn" href="${escapeHtml(routeUrl)}" target="_blank" rel="noopener" title="Abrir primeras escuelas pendientes en Google Maps" aria-label="Abrir ruta de ${escapeHtml(displayName(item))}">${icon('navigation')}</a>` : '<span class="route-placeholder"></span>'}</article>`;
+      }).join('') || renderEmpty('users', 'No hay encuestadores activos.', '')}</div>
+    </section>
+    <section class="content-section"><div class="operations-filters logistics-filters">
+      <label class="search-field">${icon('search')}<input data-admin-filter="logisticsSearch" value="${escapeHtml(state.adminFilters.logisticsSearch)}" placeholder="Codigo, escuela o localidad..."></label>
+      <select data-admin-filter="logisticsDepartment" aria-label="Departamento"><option value="">Todos los departamentos</option>${departments.map((item) => `<option value="${escapeHtml(item)}" ${state.adminFilters.logisticsDepartment === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select>
+      <select data-admin-filter="logisticsDistrict" aria-label="Distrito"><option value="">Todos los distritos</option>${districts.map((item) => `<option value="${escapeHtml(item)}" ${state.adminFilters.logisticsDistrict === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select>
+      <select data-admin-filter="logisticsStatus" aria-label="Estado"><option value="">Todos los estados</option>${['PENDIENTE', 'EN_PROCESO', 'FINALIZADO', 'CON_PENDIENTES'].map((item) => `<option value="${item}" ${state.adminFilters.logisticsStatus === item ? 'selected' : ''}>${statusLabel(item)}</option>`).join('')}</select>
+      <select data-admin-filter="logisticsSurveyor" aria-label="Encuestador"><option value="">Todos los encuestadores</option><option value="__UNASSIGNED__" ${state.adminFilters.logisticsSurveyor === '__UNASSIGNED__' ? 'selected' : ''}>Sin asignar</option>${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${state.adminFilters.logisticsSurveyor === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))}</option>`).join('')}</select>
+    </div>
+    <div class="data-table-wrap logistics-table"><table><thead><tr><th>Orden</th><th>Escuela</th><th>Departamento / distrito</th><th>Estado</th><th>Encuestador asignado</th><th>Mapa</th></tr></thead><tbody>${filtered.map((school) => {
+      const assignedCode = String(assignments[school.codigo] || '');
+      const originalCode = String(state.logisticsOriginal[school.codigo] || '');
+      const assignedUser = users.find((item) => item.codigoCensista === assignedCode);
+      return `<tr class="${assignedCode !== originalCode ? 'is-dirty' : ''}"><td>${school.ordenMuestra || ''}</td><td><strong>${escapeHtml(school.nombre)}</strong><br><small>${escapeHtml(school.codigo)} · ${escapeHtml(school.localidad)}</small></td><td>${escapeHtml(school.departamento)}<br><small>${escapeHtml(school.distrito)}</small></td><td><span class="status-pill status-${schoolStatus(progress, school.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, school.codigo))}</span></td><td><select data-logistics-assignment="${school.codigo}" aria-label="Encuestador para ${escapeHtml(school.nombre)}"><option value="">Sin asignar</option>${assignedUser && !fieldUsers.some((item) => item.codigoCensista === assignedCode) ? `<option value="${escapeHtml(assignedCode)}" selected>${escapeHtml(displayName(assignedUser))} (inactivo)</option>` : ''}${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${assignedCode === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))} · ${escapeHtml(item.codigoCensista)}</option>`).join('')}</select></td><td><a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${school.latitud},${school.longitud}" target="_blank" rel="noopener" title="Ver escuela en Google Maps" aria-label="Ver ${escapeHtml(school.nombre)} en Google Maps">${icon('map-pin')}</a></td></tr>`;
+    }).join('') || '<tr><td colspan="6">No hay escuelas con estos filtros.</td></tr>'}</tbody></table></div>
+    </section>
+  </section>`;
+}
+
+function renderRequests() {
+  if (!operationsAllowed()) return renderOperationsGuard();
+  if (!state.admin) return renderOperationsLoading('Solicitudes');
+  const currentUser = state.bootstrap?.user || {};
+  const requests = state.admin.requests || [];
+  const filtered = requests
+    .filter((item) => !state.adminFilters.requestStatus || item.estado === state.adminFilters.requestStatus)
+    .sort((left, right) => String(right.requestedAt || '').localeCompare(String(left.requestedAt || '')));
+  return `<section class="view operations-view">
+    <div class="view-heading"><div><p class="eyebrow">Accesos al sistema</p><h1>Solicitudes</h1><p>${filtered.length} solicitudes visibles de ${requests.length}.</p></div><button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div>
+    ${renderAdminTabs('requests')}
+    <div class="summary-strip request-summary">
+      <div><span>Pendientes</span><strong>${requests.filter((item) => item.estado === 'PENDIENTE').length}</strong></div><div><span>Aprobadas</span><strong>${requests.filter((item) => item.estado === 'APROBADA').length}</strong></div><div><span>Rechazadas</span><strong>${requests.filter((item) => item.estado === 'RECHAZADA').length}</strong></div><div><span>Total</span><strong>${requests.length}</strong></div>
+    </div>
+    <section class="content-section"><div class="section-heading"><div><h2>Bandeja de solicitudes</h2><p>Identidad, fecha y resolucion administrativa.</p></div><select class="compact-select" data-admin-filter="requestStatus" aria-label="Estado de solicitud"><option value="">Todos los estados</option>${['PENDIENTE', 'APROBADA', 'RECHAZADA'].map((item) => `<option value="${item}" ${state.adminFilters.requestStatus === item ? 'selected' : ''}>${requestStatusLabel(item)}</option>`).join('')}</select></div>
+      <div class="request-list">${filtered.map((item) => `<article class="list-card request-card"><div class="list-card-icon">${icon(item.estado === 'PENDIENTE' ? 'user-round-search' : item.estado === 'APROBADA' ? 'user-check' : 'user-x')}</div><div><strong>${escapeHtml(item.nombres)} ${escapeHtml(item.apellidos)}</strong><span>${escapeHtml(item.codigoCensista)} · ${escapeHtml(item.telefono || 'Sin telefono')}</span><small>Solicitada ${formatDateTime(item.requestedAt)}${item.revisadoAt ? ` · Revisada ${formatDateTime(item.revisadoAt)} por ${escapeHtml(item.revisadoPor)}` : ''}</small></div><span class="status-pill request-${String(item.estado || '').toLowerCase()}">${requestStatusLabel(item.estado)}</span>${item.estado === 'PENDIENTE' && currentUser.rol === 'ADMIN' ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="review-access" data-request="${item.solicitudId}" data-status="RECHAZADA">${icon('x')} Rechazar</button><button class="btn btn-primary" data-action="review-access" data-request="${item.solicitudId}" data-status="APROBADA">${icon('check')} Aprobar</button></div>` : ''}</article>`).join('') || renderEmpty('inbox', 'No hay solicitudes con este estado.', '')}</div>
     </section>
   </section>`;
 }
@@ -625,7 +827,7 @@ function mountView() {
     if (state.selectedSchoolCode) state.map.focusSchool(schoolByCode(state.selectedSchoolCode));
   }
   if (state.view === 'register') hydratePhotoPreviews();
-  if (state.view === 'admin' && !state.admin && !state.adminLoading) loadAdmin();
+  if (operationsViews.has(state.view) && !state.admin && !state.adminLoading) loadAdmin();
 }
 
 async function hydratePhotoPreviews() {
@@ -644,12 +846,20 @@ async function loadAdmin(force = false) {
   if (force) state.admin = null;
   try {
     state.admin = await api.adminDashboard();
+    if (force || !state.logisticsInitialized) resetLogisticsDraft();
   } catch (error) {
     toast(error.message, 'error');
   } finally {
     state.adminLoading = false;
-    if (state.view === 'admin') render();
+    if (operationsViews.has(state.view)) render();
   }
+}
+
+function resetLogisticsDraft() {
+  const assignments = primaryAssignmentMap(state.admin?.assignments || []);
+  state.logisticsOriginal = { ...assignments };
+  state.logisticsDraft = { ...assignments };
+  state.logisticsInitialized = true;
 }
 
 async function handleSubmit(event) {
@@ -832,10 +1042,10 @@ async function saveUser(form) {
   data.codigoCensista = digits(data.codigoCensista);
   data.activo = form.elements.activo.checked;
   await api.saveUser(data);
-  form.reset();
-  form.elements.activo.checked = true;
+  const wasEditing = Boolean(state.editingUserCode);
+  state.editingUserCode = '';
   await loadAdmin(true);
-  toast('Usuario guardado.', 'success');
+  toast(wasEditing ? 'Usuario actualizado.' : 'Usuario creado.', 'success');
 }
 
 async function saveAssignment(form) {
@@ -844,6 +1054,72 @@ async function saveAssignment(form) {
   await api.saveAssignment(data);
   await loadAdmin(true);
   toast('Asignacion guardada.', 'success');
+}
+
+async function toggleUser(code, active) {
+  const user = (state.admin?.users || []).find((item) => String(item.codigoCensista) === String(code));
+  if (!user || user.codigoCensista === 'admin') throw new Error('La cuenta administrativa principal esta protegida.');
+  const action = active ? 'activar' : 'desactivar';
+  if (!confirm(`¿Confirma que desea ${action} a ${displayName(user)}?`)) return;
+  await api.saveUser({
+    codigoCensista: user.codigoCensista,
+    nombres: user.nombres,
+    apellidos: user.apellidos,
+    telefono: user.telefono || '',
+    rol: user.rol,
+    activo: active
+  });
+  if (state.editingUserCode === user.codigoCensista) state.editingUserCode = '';
+  await loadAdmin(true);
+  toast(`Usuario ${active ? 'activado' : 'desactivado'}.`, 'success');
+}
+
+async function saveLogistics() {
+  const items = changedAssignmentItems(state.logisticsOriginal, state.logisticsDraft, state.catalog);
+  if (!items.length || state.logisticsSaving) return;
+  state.logisticsSaving = true;
+  render();
+  try {
+    const result = await api.saveAssignmentsBatch(items);
+    await loadBootstrap(true);
+    await loadAdmin(true);
+    toast(`${result.updated ?? items.length} asignacion${items.length === 1 ? '' : 'es'} actualizada${items.length === 1 ? '' : 's'}.`, 'success');
+  } finally {
+    state.logisticsSaving = false;
+    if (state.view === 'logistics') render();
+  }
+}
+
+function balanceLogistics() {
+  if (!confirm('Se redistribuiran en el borrador todas las escuelas no finalizadas. ¿Continuar?')) return;
+  const balanced = balancePendingAssignments(
+    state.catalog,
+    state.admin?.users || [],
+    state.logisticsDraft,
+    state.bootstrap?.progress || {}
+  );
+  if (!balanced) throw new Error('No hay encuestadores activos para realizar el balanceo.');
+  state.logisticsDraft = balanced;
+  render();
+  toast('Distribucion propuesta. Revise y pulse Guardar cambios para aplicarla.', 'info', 6500);
+}
+
+function exportLogistics() {
+  const content = logisticsCsv(
+    state.catalog,
+    state.admin?.users || [],
+    state.logisticsDraft,
+    state.bootstrap?.progress || {}
+  );
+  const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `cialpa-logistica-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+  toast('CSV de logistica generado.', 'success');
 }
 
 async function handleClick(event) {
@@ -878,6 +1154,11 @@ async function handleClick(event) {
     state.view = 'register';
     render();
   }
+  if (action === 'show-school') {
+    state.selectedSchoolCode = button.dataset.school;
+    state.view = 'schools';
+    render();
+  }
   if (action === 'save-draft') await saveActiveDraft();
   if (action === 'capture-photo') {
     updateDraftFromForm();
@@ -886,6 +1167,7 @@ async function handleClick(event) {
   if (action === 'remove-photo') await removePhoto(button.dataset.photo);
   if (action === 'capture-location') await captureDraftLocation();
   if (action === 'locate') await locateOnMap();
+  if (action === 'locate-journal') await locateOnMap();
   if (action === 'open-draft') await openDraft(button.dataset.draft);
   if (action === 'continue-record') await openRemoteRecord(button.dataset.record);
   if (action === 'delete-draft') await deleteDraft(button.dataset.draft);
@@ -896,6 +1178,29 @@ async function handleClick(event) {
     toast('Registros actualizados.', 'success');
   }
   if (action === 'reload-admin') await loadAdmin(true);
+  if (action === 'new-user') {
+    state.editingUserCode = '';
+    render();
+    document.querySelector('#user-editor input[name="codigoCensista"]')?.focus();
+  }
+  if (action === 'edit-user') {
+    state.editingUserCode = button.dataset.user;
+    render();
+    document.querySelector('#user-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  if (action === 'cancel-user-edit') {
+    state.editingUserCode = '';
+    render();
+  }
+  if (action === 'toggle-user') await toggleUser(button.dataset.user, button.dataset.active === 'true');
+  if (action === 'balance-logistics') balanceLogistics();
+  if (action === 'undo-logistics') {
+    state.logisticsDraft = { ...state.logisticsOriginal };
+    render();
+    toast('Cambios de asignacion descartados.', 'info');
+  }
+  if (action === 'save-logistics') await saveLogistics();
+  if (action === 'export-logistics') exportLogistics();
   if (action === 'review-access') await reviewAccess(button.dataset.request, button.dataset.status);
   if (action === 'install') await installApp();
   if (action === 'logout') await logout();
@@ -1078,11 +1383,44 @@ async function logout() {
   state.bootstrap = null;
   state.remote = { records: [], photos: [] };
   state.admin = null;
+  state.editingUserCode = '';
+  state.logisticsOriginal = {};
+  state.logisticsDraft = {};
+  state.logisticsInitialized = false;
   state.view = 'schools';
   render();
 }
 
 function handleChange(event) {
+  const adminFilter = event.target.closest('[data-admin-filter]');
+  if (adminFilter) {
+    state.adminFilters[adminFilter.dataset.adminFilter] = adminFilter.value;
+    if (adminFilter.dataset.adminFilter === 'logisticsDepartment') {
+      state.adminFilters.logisticsDistrict = '';
+    }
+    render();
+    return;
+  }
+  const assignment = event.target.closest('[data-logistics-assignment]');
+  if (assignment) {
+    const scrollPosition = window.scrollY;
+    state.logisticsDraft[assignment.dataset.logisticsAssignment] = assignment.value;
+    render();
+    requestAnimationFrame(() => window.scrollTo({ top: scrollPosition }));
+    return;
+  }
+  const planningSetting = event.target.closest('[data-planning-setting]');
+  if (planningSetting) {
+    const minimum = Number(planningSetting.min || 1);
+    const maximum = Number(planningSetting.max || Number.MAX_SAFE_INTEGER);
+    state.planningSettings[planningSetting.dataset.planningSetting] = Math.min(
+      maximum,
+      Math.max(minimum, Number(planningSetting.value || minimum))
+    );
+    saveJson('cialpa-fotos-planning-settings-v1', state.planningSettings);
+    render();
+    return;
+  }
   const filter = event.target.closest('[data-filter]');
   if (filter) {
     state.filters[filter.dataset.filter] = filter.value;
@@ -1096,13 +1434,21 @@ function handleChange(event) {
 
 let searchTimer;
 function handleInput(event) {
-  const filter = event.target.closest('[data-filter="search"]');
+  const schoolFilter = event.target.closest('[data-filter="search"]');
+  const adminFilter = event.target.closest('[data-admin-filter$="Search"]');
+  const filter = schoolFilter || adminFilter;
   if (!filter) return;
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => {
-    state.filters.search = filter.value;
+    if (schoolFilter) state.filters.search = filter.value;
+    if (adminFilter) state.adminFilters[adminFilter.dataset.adminFilter] = filter.value;
     render();
-    document.querySelector('[data-filter="search"]')?.focus();
+    const selector = schoolFilter
+      ? '[data-filter="search"]'
+      : `[data-admin-filter="${adminFilter.dataset.adminFilter}"]`;
+    const input = document.querySelector(selector);
+    input?.focus();
+    input?.setSelectionRange?.(input.value.length, input.value.length);
   }, 180);
 }
 
@@ -1188,6 +1534,10 @@ function statusLabel(status = 'PENDIENTE') {
   return ({ PENDIENTE: 'Pendiente', EN_PROCESO: 'En proceso', FINALIZADO: 'Finalizado', CON_PENDIENTES: 'Con pendientes' })[status] || status;
 }
 
+function requestStatusLabel(status = 'PENDIENTE') {
+  return ({ PENDIENTE: 'Pendiente', APROBADA: 'Aprobada', RECHAZADA: 'Rechazada' })[status] || status;
+}
+
 function roleLabel(role = '') {
   return ({ ADMIN: 'Administrador', SUPERVISOR: 'Supervisor', ENCUESTADOR: 'Encuestador' })[role] || role;
 }
@@ -1215,6 +1565,13 @@ function formatDateTime(value) {
   if (!value) return 'Sin fecha';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? escapeHtml(value) : new Intl.DateTimeFormat('es-PY', { dateStyle: 'short', timeStyle: 'short' }).format(date);
+}
+
+function formatNumber(value, decimals = 0) {
+  return new Intl.NumberFormat('es-PY', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals
+  }).format(Number(value || 0));
 }
 
 function formatBytes(bytes) {

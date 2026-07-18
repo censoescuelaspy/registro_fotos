@@ -117,10 +117,11 @@ function saveAssignment_(input, session, client) {
   requireRole_(session, [ROLE.ADMIN, ROLE.SUPERVISOR]);
   const surveyor = digits_(input.codigoCensista, 'codigo de censista', 5, 12);
   const school = digits_(input.codigoEscuela, 'codigo de escuela', 3, 12);
+  const activate = input.activo !== false;
   const userExists = objects_(SHEETS.USERS).some(function (user) {
     return String(user.codigo_censista) === surveyor && active_(user.activo);
   });
-  if (!userExists) throw apiError_('USER_NOT_FOUND', 'El usuario no existe o esta inactivo.');
+  if (activate && !userExists) throw apiError_('USER_NOT_FOUND', 'El usuario no existe o esta inactivo.');
   const schoolExists = objects_(SHEETS.SCHOOLS).some(function (row) { return String(row.codigo) === school; });
   if (!schoolExists) throw apiError_('SCHOOL_NOT_FOUND', 'La escuela no existe.');
   const key = surveyor + ':' + school;
@@ -149,6 +150,108 @@ function saveAssignment_(input, session, client) {
   }
   audit_(session, 'GUARDAR_ASIGNACION', 'ASIGNACION', key, { activo: input.activo !== false }, client);
   return { ok: true };
+}
+
+function saveAssignmentsBatch_(items, session, client) {
+  requireRole_(session, [ROLE.ADMIN, ROLE.SUPERVISOR]);
+  if (!Array.isArray(items) || !items.length) {
+    throw apiError_('VALIDATION_ERROR', 'No se recibieron cambios de asignacion.');
+  }
+  if (items.length > 200) {
+    throw apiError_('VALIDATION_ERROR', 'El lote supera el maximo de 200 escuelas.');
+  }
+
+  const validSchools = {};
+  objects_(SHEETS.SCHOOLS).forEach(function (school) {
+    validSchools[String(school.codigo)] = true;
+  });
+  const validUsers = {};
+  objects_(SHEETS.USERS).forEach(function (user) {
+    if (active_(user.activo) && String(user.rol) !== ROLE.ADMIN) {
+      validUsers[String(user.codigo_censista)] = true;
+    }
+  });
+  const seenSchools = {};
+  const normalized = items.map(function (item) {
+    const school = digits_(item.codigoEscuela, 'codigo de escuela', 3, 12);
+    const surveyor = item.codigoCensista
+      ? digits_(item.codigoCensista, 'codigo de censista', 5, 12)
+      : '';
+    if (seenSchools[school]) throw apiError_('VALIDATION_ERROR', 'La escuela ' + school + ' esta repetida en el lote.');
+    if (!validSchools[school]) throw apiError_('SCHOOL_NOT_FOUND', 'La escuela ' + school + ' no existe.');
+    if (surveyor && !validUsers[surveyor]) {
+      throw apiError_('USER_NOT_FOUND', 'El censista ' + surveyor + ' no existe, esta inactivo o no es personal de campo.');
+    }
+    seenSchools[school] = true;
+    return { codigoEscuela: school, codigoCensista: surveyor };
+  });
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const sheet = spreadsheet_().getSheetByName(SHEETS.ASSIGNMENTS);
+    const names = headers_(SHEETS.ASSIGNMENTS);
+    const indexes = {};
+    names.forEach(function (name, index) { indexes[name] = index; });
+    const rowCount = Math.max(0, sheet.getLastRow() - 1);
+    const values = rowCount ? sheet.getRange(2, 1, rowCount, names.length).getValues() : [];
+    const now = nowIso_();
+
+    normalized.forEach(function (item) {
+      const matching = [];
+      values.forEach(function (row, index) {
+        if (String(row[indexes.codigo_escuela] || '') === item.codigoEscuela) matching.push(index);
+      });
+      let selected = -1;
+      if (item.codigoCensista) {
+        for (let position = matching.length - 1; position >= 0; position -= 1) {
+          const index = matching[position];
+          if (String(values[index][indexes.codigo_censista] || '') === item.codigoCensista) {
+            selected = index;
+            break;
+          }
+        }
+      }
+      matching.forEach(function (index) {
+        const row = values[index];
+        row[indexes.activo] = index === selected;
+        row[indexes.asignado_por] = session.codigoCensista;
+        row[indexes.updated_at] = now;
+      });
+      if (item.codigoCensista && selected < 0) {
+        const object = {
+          assignment_id: Utilities.getUuid(),
+          codigo_censista: item.codigoCensista,
+          codigo_escuela: item.codigoEscuela,
+          activo: true,
+          fecha_asignacion: now,
+          asignado_por: session.codigoCensista,
+          notas: 'Asignacion actualizada desde logistica',
+          updated_at: now
+        };
+        const newRow = names.map(function (name) { return safeCell_(object[name]); });
+        const blankRow = values.findIndex(function (row) {
+          return !row[indexes.assignment_id]
+            && !row[indexes.codigo_censista]
+            && !row[indexes.codigo_escuela];
+        });
+        if (blankRow >= 0) values[blankRow] = newRow;
+        else values.push(newRow);
+      }
+    });
+
+    if (values.length > sheet.getMaxRows() - 1) {
+      sheet.insertRowsAfter(sheet.getMaxRows(), values.length - (sheet.getMaxRows() - 1));
+    }
+    if (values.length) sheet.getRange(2, 1, values.length, names.length).setValues(values);
+  } finally {
+    lock.releaseLock();
+  }
+  audit_(session, 'GUARDAR_ASIGNACIONES_LOTE', 'ASIGNACION', 'LOTE', {
+    cantidad: normalized.length,
+    sinAsignar: normalized.filter(function (item) { return !item.codigoCensista; }).length
+  }, client);
+  return { ok: true, updated: normalized.length };
 }
 
 function reviewAccess_(payload, session, client) {

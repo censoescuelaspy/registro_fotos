@@ -10,7 +10,18 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 4. Selecciona el tipo y numero de elemento y abre la camara.
 5. La app reduce la imagen y agrega un pie sin tapar la fotografia.
 6. El registro y las fotos se sincronizan; sin internet quedan en IndexedDB hasta recuperar conexion.
-7. Desde **Mi trabajo** puede reabrir un registro sincronizado y continuar la secuencia de fotos sin perder los codigos anteriores.
+7. Desde **Mi jornada** puede reabrir un registro sincronizado y continuar la secuencia de fotos sin perder los codigos anteriores.
+
+## Operacion y supervision
+
+- **Mi jornada** muestra avance personal, siguiente escuela, borradores, cola local y registros sincronizados.
+- **Control** consolida escuelas finalizadas, registros, fotos, solicitudes y avance por censista.
+- **Encuestadores** permite al administrador crear, editar, activar y desactivar usuarios; la cuenta administrativa principal permanece protegida.
+- **Logistica** permite filtrar por territorio, estado y censista, estimar jornadas, comparar cargas, proponer un balanceo, preparar rutas, deshacer cambios y guardar asignaciones por lote.
+- **Solicitudes** mantiene una bandeja separada por estado para aprobar o rechazar accesos.
+- El CSV logistico conserva escuela, ubicacion, estado y censista para coordinacion externa.
+
+Los cambios realizados en **Logistica** son un borrador hasta pulsar **Guardar cambios**. Al confirmar, queda una sola asignacion activa por escuela y las asignaciones anteriores permanecen inactivas como historial.
 
 Ejemplo de identificador:
 
@@ -26,6 +37,7 @@ El mismo codigo se usa en la imagen, el nombre del archivo, Google Drive y Googl
 - `assets/data/pilot-schools.json`: catalogo vigente de 86 escuelas piloto de Capital y Central.
 - `gas/`: backend de Google Apps Script vinculado a la hoja de control.
 - `assets/js/api.js`: transporte POST por iframe y `postMessage` para comunicar GitHub Pages con GAS sin exponer datos en la URL.
+- `assets/js/operations.js`: filtros, metricas, balanceo, rutas y exportacion de la operacion territorial.
 - `docs/`: ficha de contingencia imprimible y manual del censista.
 - `.github/workflows/pages.yml`: publicacion automatica de la PWA en GitHub Pages.
 - `tests/`: pruebas de humo Playwright en escritorio y celular.

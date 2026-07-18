@@ -38,9 +38,28 @@ function demoData() {
         apellidos: 'Demostracion',
         rol: 'ADMIN',
         activo: true
+      },
+      {
+        codigoCensista: '2345678',
+        nombres: 'Ana',
+        apellidos: 'Lopez',
+        telefono: '0981000001',
+        rol: 'ENCUESTADOR',
+        activo: true
+      },
+      {
+        codigoCensista: '3456789',
+        nombres: 'Bruno',
+        apellidos: 'Diaz',
+        telefono: '0981000002',
+        rol: 'ENCUESTADOR',
+        activo: true
       }
     ],
-    assignments: [],
+    assignments: [
+      { assignmentId: crypto.randomUUID(), codigoCensista: '2345678', codigoEscuela: '11007', activo: true, updatedAt: new Date().toISOString() },
+      { assignmentId: crypto.randomUUID(), codigoCensista: '3456789', codigoEscuela: '10038', activo: true, updatedAt: new Date().toISOString() }
+    ],
     requests: []
   };
   localStorage.setItem(demoStoreKey, JSON.stringify(initial));
@@ -184,6 +203,28 @@ async function demoRequest(action, payload = {}) {
       saveDemo(data);
       return { ok: true };
     }
+    case 'saveAssignmentsBatch': {
+      const items = Array.isArray(payload.assignments) ? payload.assignments : [];
+      for (const item of items) {
+        data.assignments.forEach((assignment) => {
+          if (assignment.codigoEscuela === item.codigoEscuela) assignment.activo = false;
+        });
+        if (!item.codigoCensista) continue;
+        const existing = data.assignments.find((assignment) => assignment.codigoEscuela === item.codigoEscuela
+          && assignment.codigoCensista === item.codigoCensista);
+        if (existing) Object.assign(existing, { activo: true, updatedAt: now });
+        else data.assignments.push({
+          assignmentId: crypto.randomUUID(),
+          codigoCensista: item.codigoCensista,
+          codigoEscuela: item.codigoEscuela,
+          activo: true,
+          fechaAsignacion: now,
+          updatedAt: now
+        });
+      }
+      saveDemo(data);
+      return { ok: true, updated: items.length };
+    }
     case 'reviewAccess': {
       const request = data.requests.find((item) => item.solicitudId === payload.solicitudId);
       if (request) request.estado = payload.estado;
@@ -313,6 +354,7 @@ export class ApiClient {
   adminDashboard() { return this.request('adminDashboard'); }
   saveUser(user) { return this.request('saveUser', { user }); }
   saveAssignment(assignment) { return this.request('saveAssignment', { assignment }); }
+  saveAssignmentsBatch(assignments) { return this.request('saveAssignmentsBatch', { assignments }); }
   reviewAccess(solicitudId, estado, notas = '') {
     return this.request('reviewAccess', { solicitudId, estado, notas });
   }

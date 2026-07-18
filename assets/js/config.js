@@ -1,6 +1,6 @@
 export const APP_CONFIG = Object.freeze({
   appName: 'CIALPA Fotos',
-  version: '1.0.4',
+  version: '1.1.0',
   buildDate: '2026-07-18',
   gasExecUrl: 'https://script.google.com/macros/s/AKfycbz8RmR-TqSb3FzaLSgMO2NlTTOfRPWuYjSC5ZyXw1Vr5iL-PBYeDIerNvCVj--hNjYk/exec',
   schoolCatalogUrl: './assets/data/pilot-schools.json',

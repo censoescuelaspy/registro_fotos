@@ -12,11 +12,18 @@ export class SchoolMap {
     this.map = null;
     this.markers = new Map();
     this.userMarker = null;
+    this.invalidateTimer = null;
   }
 
   init() {
     if (this.map || !this.element || !window.L) return;
-    this.map = L.map(this.element, { zoomControl: true, maxZoom: 21 }).setView([-25.3, -57.55], 10);
+    this.map = L.map(this.element, {
+      zoomControl: true,
+      maxZoom: 21,
+      zoomAnimation: false,
+      fadeAnimation: false,
+      markerZoomAnimation: false
+    }).setView([-25.3, -57.55], 10);
     const streets = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 20,
       attribution: '&copy; OpenStreetMap contributors'
@@ -63,13 +70,14 @@ export class SchoolMap {
       marker.bindTooltip(`<strong>${school.codigo}</strong><br>${escapeMapText(school.nombre)}`);
       bounds.push([school.latitud, school.longitud]);
     }
-    if (bounds.length && !selectedCode) this.map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 });
-    setTimeout(() => this.map?.invalidateSize(), 50);
+    if (bounds.length && !selectedCode) this.map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14, animate: false });
+    clearTimeout(this.invalidateTimer);
+    this.invalidateTimer = setTimeout(() => this.map?.invalidateSize({ animate: false }), 50);
   }
 
   focusSchool(school) {
     if (!this.map || !school) return;
-    this.map.setView([school.latitud, school.longitud], 18, { animate: true });
+    this.map.setView([school.latitud, school.longitud], 18, { animate: false });
     this.markers.get(school.codigo)?.openTooltip();
   }
 
@@ -92,9 +100,18 @@ export class SchoolMap {
   }
 
   destroy() {
-    this.map?.remove();
+    clearTimeout(this.invalidateTimer);
+    this.invalidateTimer = null;
+    const map = this.map;
     this.map = null;
+    if (map) {
+      map.stop();
+      map.eachLayer((layer) => layer.off());
+      map.off();
+      map.remove();
+    }
     this.markers.clear();
+    this.userMarker = null;
   }
 }
 

@@ -76,7 +76,7 @@ test('reabre un registro sincronizado y continua la secuencia fotografica', asyn
     buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#edf3f8"/></svg>')
   });
   await page.getByRole('button', { name: /Finalizar y sincronizar/ }).click();
-  await expect(page.getByRole('heading', { name: 'Mi trabajo' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Mi jornada' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Registros sincronizados', exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Continuar' })).toBeVisible();
   await page.getByRole('button', { name: 'Continuar' }).click();
@@ -86,10 +86,83 @@ test('reabre un registro sincronizado y continua la secuencia fotografica', asyn
 });
 
 test('expone control administrativo y resumen por censista', async ({ page }) => {
-  await page.getByRole('button', { name: 'Administrar' }).click();
-  await expect(page.getByRole('heading', { name: 'Administracion' })).toBeVisible();
+  await page.getByRole('button', { name: 'Control' }).click();
+  await expect(page.getByRole('heading', { name: 'Resumen general' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Avance por censista' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Asignar escuela' })).toBeVisible();
+  await expect(page.locator('.operations-tab.is-active')).toContainText('Resumen');
+});
+
+test('administra encuestadores y conserva la cuenta principal protegida', async ({ page }) => {
+  await page.getByRole('button', { name: 'Control' }).click();
+  await page.locator('.operations-tab[data-view="surveyors"]').click();
+  await expect(page.getByRole('heading', { name: 'Administrar encuestadores' })).toBeVisible();
+  await expect(page.getByText('Protegido', { exact: true })).toBeVisible();
+
+  await page.getByLabel('Codigo / cedula').fill('4567890');
+  await page.getByLabel('Nombres').fill('Carla');
+  await page.getByLabel('Apellidos').fill('Benitez');
+  await page.getByLabel('Telefono').fill('0981000003');
+  await page.getByLabel('PIN inicial').fill('4321');
+  await page.getByRole('button', { name: 'Crear usuario' }).click();
+  await expect(page.getByText('Carla Benitez', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Editar Carla Benitez' }).click();
+  await expect(page.getByRole('heading', { name: 'Editar usuario' })).toBeVisible();
+  await expect(page.getByLabel('Codigo / cedula')).toHaveAttribute('readonly', '');
+});
+
+test('planifica, filtra, deshace y guarda asignaciones logisticas', async ({ page }) => {
+  await page.getByRole('button', { name: 'Control' }).click();
+  await page.locator('.operations-tab[data-view="logistics"]').click();
+  await expect(page.getByRole('heading', { name: 'Logistica de campo' })).toBeVisible();
+  const assignment = page.locator('[data-logistics-assignment="12110"]');
+  await assignment.selectOption('2345678');
+  await expect(page.locator('.dirty-banner')).toContainText('1 cambio sin guardar');
+  await page.getByRole('button', { name: 'Deshacer' }).click();
+  await expect(page.locator('.dirty-banner')).toHaveCount(0);
+
+  await page.locator('[data-logistics-assignment="12110"]').selectOption('2345678');
+  await page.getByRole('button', { name: /Guardar 1 cambio/ }).click();
+  await expect(page.getByText('1 asignacion actualizada.')).toBeVisible();
+  await expect(page.locator('[data-logistics-assignment="12110"]')).toHaveValue('2345678');
+
+  await page.getByPlaceholder('Codigo, escuela o localidad...').fill('12110');
+  await expect(page.locator('[data-logistics-assignment]')).toHaveCount(1);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'CSV' }).click();
+  await expect(await download).toBeTruthy();
+});
+
+test('mantiene solicitudes en una bandeja administrativa separada', async ({ page }) => {
+  await page.getByRole('button', { name: 'Control' }).click();
+  await page.locator('.operations-tab[data-view="requests"]').click();
+  await expect(page.getByRole('heading', { name: 'Solicitudes', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Bandeja de solicitudes' })).toBeVisible();
+});
+
+test('recorre los modulos operativos sin errores ni desborde de pagina', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  const views = [
+    ['pending', 'Mi jornada'],
+    ['admin', 'Resumen general'],
+    ['surveyors', 'Administrar encuestadores'],
+    ['logistics', 'Logistica de campo'],
+    ['requests', 'Solicitudes'],
+    ['account', 'Mi cuenta']
+  ];
+  for (const [view, heading] of views) {
+    await page.locator(`[data-view="${view}"]:visible`).first().click();
+    await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
+    const dimensions = await page.evaluate(() => ({
+      viewport: document.documentElement.clientWidth,
+      page: document.documentElement.scrollWidth
+    }));
+    expect(dimensions.page).toBeLessThanOrEqual(dimensions.viewport + 1);
+  }
+  expect(errors).toEqual([]);
 });
 
 test('intercambia respuestas GAS mediante el puente iframe sin depender de CORS', async ({ page }) => {
@@ -103,7 +176,7 @@ test('intercambia respuestas GAS mediante el puente iframe sin depender de CORS'
         top.postMessage({
           source: 'CIALPA_GAS',
           requestId: window.name.replace('cialpa-gas-', ''),
-          payload: { ok: true, data: { service: 'CIALPA Fotos', version: '1.0.4' } }
+          payload: { ok: true, data: { service: 'CIALPA Fotos', version: '1.1.0' } }
         }, '*');
       <\/script>`
     });
@@ -114,7 +187,7 @@ test('intercambia respuestas GAS mediante el puente iframe sin depender de CORS'
     const api = new ApiClient({
       demo: false,
       gasExecUrl: 'https://script.google.com/mock',
-      version: '1.0.4'
+      version: '1.1.0'
     });
     const health = await api.health();
     return {
@@ -126,7 +199,7 @@ test('intercambia respuestas GAS mediante el puente iframe sin depender de CORS'
 
   expect(postedBody).toContain('health');
   expect(result).toEqual({
-    health: { service: 'CIALPA Fotos', version: '1.0.4' },
+    health: { service: 'CIALPA Fotos', version: '1.1.0' },
     iframes: 0,
     forms: 0
   });
@@ -154,7 +227,7 @@ test('acepta el subdominio dinamico oficial de HtmlService', async ({ page }) =>
     };
     try {
       const { ApiClient } = await import('/assets/js/api.js');
-      const api = new ApiClient({ demo: false, version: '1.0.4', gasExecUrl: '/fake-gas' });
+      const api = new ApiClient({ demo: false, version: '1.1.0', gasExecUrl: '/fake-gas' });
       return await api.health();
     } finally {
       HTMLFormElement.prototype.submit = formSubmit;

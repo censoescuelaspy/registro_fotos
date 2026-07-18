@@ -32,8 +32,19 @@ Crear una PWA separada para capturar y organizar fotografias del piloto CIALPA, 
 - Autorizacion de Sheets/Drive completada desde el editor oficial de Apps Script.
 - Error inicial de `ensureSheet_` corregido al resolver los encabezados por nombre real de hoja.
 - Codigo GAS actualizado y deployment `AKfycbz8...hNjYk` configurado en la PWA.
-- Al actualizar la version con `clasp`, Google restringio nuevamente el acceso anonimo del deployment. Debe guardarse otra vez como **Cualquier usuario** desde la cuenta propietaria y comprobar `"ok": true`.
-- El workflow de GitHub Pages queda preparado en `docs/PAGES_WORKFLOW_TEMPLATE.yml`. La cuenta colaboradora puede hacer push del proyecto, pero GitHub exige ampliar su token con alcance `workflow` antes de activarlo en `.github/workflows/pages.yml`.
+- Al actualizar la version con `clasp`, Google restringio temporalmente el acceso anonimo; la cuenta propietaria restauro **Cualquier usuario** y el endpoint volvio a responder `"ok": true`.
+- La cuenta colaboradora amplio su token con alcance `workflow` y se activo `.github/workflows/pages.yml` para publicar la PWA automaticamente.
+
+## 2026-07-18 - Reintento de publicacion
+
+### Verificacion operativa
+
+- El endpoint GAS responde `200`, `ok: true`, version `1.0.2` y esquema `2026-07-18.1`.
+- La hoja en linea contiene las nueve pestanas normalizadas y conserva configuracion regional `es_PY` con zona horaria `America/Asuncion`.
+- La pestana `ESCUELAS` contiene las 86 instituciones piloto de Capital y Central.
+- Se activo el workflow de GitHub Pages despues de autorizar el alcance `workflow` para la cuenta colaboradora.
+- `secureStorage` retiro el permiso publico de edicion de la hoja y mantuvo privada la carpeta de fotografias. El backend del propietario continuo respondiendo despues del cambio.
+- La cuenta colaboradora perdio el acceso indirecto que provenia del enlace publico. Para futuras subidas con `clasp`, el propietario debe compartir explicitamente el proyecto Apps Script con el mantenedor, sin reabrir la hoja a cualquiera con el enlace.
 
 ### Seguridad
 

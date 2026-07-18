@@ -26,7 +26,7 @@ El mismo codigo se usa en la imagen, el nombre del archivo, Google Drive y Googl
 - `assets/data/pilot-schools.json`: catalogo vigente de 86 escuelas piloto de Capital y Central.
 - `gas/`: backend de Google Apps Script vinculado a la hoja de control.
 - `docs/`: ficha de contingencia imprimible y manual del censista.
-- `docs/PAGES_WORKFLOW_TEMPLATE.yml`: workflow listo para activar cuando la cuenta GitHub tenga alcance `workflow`.
+- `.github/workflows/pages.yml`: publicacion automatica de la PWA en GitHub Pages.
 - `tests/`: pruebas de humo Playwright en escritorio y celular.
 - `tools/generate_contingency_presentation.py`: fuente reproducible del PPTX editable de dos paginas.
 

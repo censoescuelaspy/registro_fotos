@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'cialpa-fotos-v1.0.2';
+const CACHE_VERSION = 'cialpa-fotos-v1.0.4';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_ASSETS = [
   './',

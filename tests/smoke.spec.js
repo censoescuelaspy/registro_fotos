@@ -3,8 +3,8 @@ const { test, expect } = require('@playwright/test');
 test.beforeEach(async ({ page }) => {
   await page.goto('/?demo=1');
   await expect(page.getByRole('heading', { name: 'Ingresar' })).toBeVisible();
-  await page.getByLabel('Codigo de censista / cedula').fill('1234567');
-  await page.getByLabel('PIN', { exact: true }).fill('1234');
+  await page.getByLabel('Usuario o cedula').fill('1234567');
+  await page.getByLabel('Contrasena / PIN', { exact: true }).fill('1234');
   await page.getByRole('button', { name: 'Ingresar' }).click();
   await expect(page.getByRole('heading', { name: 'Escuelas asignadas' })).toBeVisible();
 });
@@ -90,4 +90,75 @@ test('expone control administrativo y resumen por censista', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'Administracion' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Avance por censista' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Asignar escuela' })).toBeVisible();
+});
+
+test('intercambia respuestas GAS mediante el puente iframe sin depender de CORS', async ({ page }) => {
+  let postedBody = '';
+  await page.route('https://script.google.com/mock', async (route) => {
+    postedBody = route.request().postData() || '';
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: `<!doctype html><script>
+        top.postMessage({
+          source: 'CIALPA_GAS',
+          requestId: window.name.replace('cialpa-gas-', ''),
+          payload: { ok: true, data: { service: 'CIALPA Fotos', version: '1.0.4' } }
+        }, '*');
+      <\/script>`
+    });
+  });
+
+  const result = await page.evaluate(async () => {
+    const { ApiClient } = await import('./assets/js/api.js?bridge-test=1');
+    const api = new ApiClient({
+      demo: false,
+      gasExecUrl: 'https://script.google.com/mock',
+      version: '1.0.4'
+    });
+    const health = await api.health();
+    return {
+      health,
+      iframes: document.querySelectorAll('iframe[name^="cialpa-gas-"]').length,
+      forms: document.querySelectorAll('form[target^="cialpa-gas-"]').length
+    };
+  });
+
+  expect(postedBody).toContain('health');
+  expect(result).toEqual({
+    health: { service: 'CIALPA Fotos', version: '1.0.4' },
+    iframes: 0,
+    forms: 0
+  });
+});
+
+test('acepta el subdominio dinamico oficial de HtmlService', async ({ page }) => {
+  await page.goto('/?demo=1');
+  const result = await page.evaluate(async () => {
+    const formSubmit = HTMLFormElement.prototype.submit;
+    HTMLFormElement.prototype.submit = function submitMock() {
+      const requestId = this.querySelector('[name="requestId"]').value;
+      window.postMessage({
+        source: 'CIALPA_GAS',
+        requestId,
+        payload: { ok: true, data: { service: 'CIALPA Fotos' } }
+      }, location.origin);
+      window.dispatchEvent(new MessageEvent('message', {
+        origin: 'https://dynamic-id-script.googleusercontent.com',
+        data: {
+          source: 'CIALPA_GAS',
+          requestId,
+          payload: { ok: true, data: { service: 'CIALPA Fotos' } }
+        }
+      }));
+    };
+    try {
+      const { ApiClient } = await import('/assets/js/api.js');
+      const api = new ApiClient({ demo: false, version: '1.0.4', gasExecUrl: '/fake-gas' });
+      return await api.health();
+    } finally {
+      HTMLFormElement.prototype.submit = formSubmit;
+    }
+  });
+  expect(result).toEqual({ service: 'CIALPA Fotos' });
 });

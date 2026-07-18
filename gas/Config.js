@@ -1,12 +1,17 @@
 const SYSTEM_CONFIG = Object.freeze({
   APP_NAME: 'CIALPA Fotos',
-  APP_VERSION: '1.0.2',
+  APP_VERSION: '1.0.4',
   SCHEMA_VERSION: '2026-07-18.1',
   SPREADSHEET_ID: '1R_vG-q96SbzoYmMg9AL-PMY1YUeSyRTl5tJSfuGNqUo',
   ROOT_FOLDER_NAME: 'CIALPA_REGISTRO_FOTOS',
   SESSION_HOURS: 12,
   MAX_PHOTO_BYTES: 15 * 1024 * 1024,
   MAX_TEXT: 1000,
+  ALLOWED_ORIGINS: [
+    'https://censoescuelaspy.github.io',
+    'http://127.0.0.1:4173',
+    'http://localhost:4173'
+  ],
   CACHE_SCHEMA_KEY: 'schema-ready-2026-07-18.1'
 });
 

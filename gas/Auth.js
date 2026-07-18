@@ -10,6 +10,12 @@ function validatePin_(pin) {
   return normalized;
 }
 
+function loginCode_(value) {
+  const normalized = String(value == null ? '' : value).trim().toLowerCase();
+  if (normalized === 'admin') return normalized;
+  return digits_(normalized, 'usuario o cedula', 5, 12);
+}
+
 function secureEqual_(left, right) {
   const a = String(left || '');
   const b = String(right || '');
@@ -52,7 +58,7 @@ function bootstrapAdmin_(payload, client) {
   if (!expected || !secureEqual_(sha256_(supplied), sha256_(expected))) {
     throw apiError_('BOOTSTRAP_INVALID', 'La clave inicial no es valida.');
   }
-  const code = digits_(payload.codigoCensista, 'codigo de censista', 5, 12);
+  const code = loginCode_(payload.codigoCensista);
   const pin = validatePin_(payload.pin);
   const salt = randomSecret_().slice(0, 32);
   const now = nowIso_();
@@ -105,7 +111,7 @@ function requestAccess_(payload, client) {
 }
 
 function login_(payload, client) {
-  const code = digits_(payload.codigoCensista, 'codigo de censista', 5, 12);
+  const code = loginCode_(payload.codigoCensista);
   const throttle = CacheService.getScriptCache();
   const throttleKey = 'login-fail-' + code;
   const failures = Number(throttle.get(throttleKey) || 0);
@@ -117,7 +123,7 @@ function login_(payload, client) {
   if (!user || !active_(user.activo) || !secureEqual_(candidateHash, String(user.pin_hash || ''))) {
     throttle.put(throttleKey, String(failures + 1), 600);
     audit_(null, 'LOGIN_FALLIDO', 'USUARIO', code, {}, client);
-    throw apiError_('AUTH_INVALID', 'Cedula o PIN incorrectos.');
+    throw apiError_('AUTH_INVALID', 'Usuario o contrasena incorrectos.');
   }
   throttle.remove(throttleKey);
   const token = randomSecret_();

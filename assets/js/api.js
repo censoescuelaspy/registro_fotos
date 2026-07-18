@@ -1,5 +1,19 @@
 import { APP_CONFIG } from './config.js';
 
+function isGasMessageOrigin(origin) {
+  try {
+    const url = new URL(origin);
+    return url.protocol === 'https:' && (
+      url.hostname === 'script.google.com'
+      || url.hostname === 'script.googleusercontent.com'
+      || url.hostname.endsWith('.script.googleusercontent.com')
+      || url.hostname.endsWith('-script.googleusercontent.com')
+    );
+  } catch (ignore) {
+    return false;
+  }
+}
+
 export class ApiError extends Error {
   constructor(message, code = 'API_ERROR', details = null) {
     super(message);
@@ -191,6 +205,69 @@ export class ApiClient {
     this.session = session || null;
   }
 
+  requestViaIframe(request, timeoutMs) {
+    return new Promise((resolve, reject) => {
+      const requestId = crypto.randomUUID();
+      const target = `cialpa-gas-${requestId}`;
+      const iframe = document.createElement('iframe');
+      const form = document.createElement('form');
+      let settled = false;
+
+      iframe.name = target;
+      iframe.hidden = true;
+      iframe.title = 'Comunicacion segura con el servidor';
+      iframe.referrerPolicy = 'no-referrer';
+      form.hidden = true;
+      form.method = 'POST';
+      form.action = this.config.gasExecUrl;
+      form.target = target;
+      form.enctype = 'multipart/form-data';
+      form.acceptCharset = 'UTF-8';
+
+      const addField = (name, value) => {
+        const input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = name;
+        input.value = value;
+        form.append(input);
+      };
+      addField('transport', 'iframe');
+      addField('requestId', requestId);
+      addField('origin', location.origin);
+      addField('request', JSON.stringify(request));
+
+      const cleanup = () => {
+        window.removeEventListener('message', onMessage);
+        iframe.remove();
+        form.remove();
+      };
+      const finish = (callback, value) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        cleanup();
+        callback(value);
+      };
+      const onMessage = (event) => {
+        if (!isGasMessageOrigin(event.origin)) return;
+        const message = event.data;
+        if (!message || message.source !== 'CIALPA_GAS' || message.requestId !== requestId) return;
+        finish(resolve, message.payload);
+      };
+      const timer = setTimeout(() => {
+        finish(reject, new ApiError('La conexion tardo demasiado. El registro puede quedar en cola.', 'TIMEOUT'));
+      }, timeoutMs);
+
+      window.addEventListener('message', onMessage);
+      document.body.append(iframe, form);
+      try {
+        form.submit();
+      } catch (error) {
+        finish(reject, error);
+      }
+    });
+  }
+
   async request(action, payload = {}, options = {}) {
     if (this.config.demo) {
       return demoRequest(action, { ...payload, session: this.session });
@@ -198,49 +275,29 @@ export class ApiClient {
     if (!this.config.gasExecUrl) {
       throw new ApiError('El servicio de sincronizacion aun no esta configurado.', 'BACKEND_NOT_CONFIGURED');
     }
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), options.timeout || 45000);
     try {
-      const response = await fetch(this.config.gasExecUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-        body: JSON.stringify({
-          action,
-          token: this.session?.token || '',
-          payload,
-          client: {
-            version: this.config.version,
-            deviceId: getDeviceId(),
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-            userAgent: navigator.userAgent.slice(0, 500)
-          }
-        }),
-        redirect: 'follow',
-        signal: controller.signal
-      });
-      const text = await response.text();
-      let result;
-      try {
-        result = JSON.parse(text);
-      } catch {
-        throw new ApiError('El servidor devolvio una respuesta no valida.', 'INVALID_RESPONSE');
-      }
-      if (!response.ok || result.ok === false) {
+      const result = await this.requestViaIframe({
+        action,
+        token: this.session?.token || '',
+        payload,
+        client: {
+          version: this.config.version,
+          deviceId: getDeviceId(),
+          timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || '',
+          userAgent: navigator.userAgent.slice(0, 500)
+        }
+      }, options.timeout || 45000);
+      if (!result || result.ok === false) {
         throw new ApiError(
-          result.error?.message || `Error del servidor (${response.status}).`,
-          result.error?.code || 'SERVER_ERROR',
-          result.error?.details || null
+          result?.error?.message || 'El servidor devolvio una respuesta no valida.',
+          result?.error?.code || 'SERVER_ERROR',
+          result?.error?.details || null
         );
       }
       return result.data ?? result;
     } catch (error) {
-      if (error.name === 'AbortError') {
-        throw new ApiError('La conexion tardo demasiado. El registro puede quedar en cola.', 'TIMEOUT');
-      }
       if (error instanceof ApiError) throw error;
       throw new ApiError('No se pudo conectar con el servicio de sincronizacion.', 'NETWORK_ERROR');
-    } finally {
-      clearTimeout(timeout);
     }
   }
 

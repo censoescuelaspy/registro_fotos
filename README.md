@@ -4,7 +4,7 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 
 ## Flujo de campo
 
-1. El censista ingresa con su cedula y PIN.
+1. El censista ingresa con su cedula y PIN; el administrador usa su nombre de usuario reservado.
 2. Abre una escuela asignada desde el mapa o la lista.
 3. Repite los numeros de la ficha en papel.
 4. Selecciona el tipo y numero de elemento y abre la camara.
@@ -25,6 +25,7 @@ El mismo codigo se usa en la imagen, el nombre del archivo, Google Drive y Googl
 - `index.html`, `assets/`, `sw.js`: PWA estatica para GitHub Pages.
 - `assets/data/pilot-schools.json`: catalogo vigente de 86 escuelas piloto de Capital y Central.
 - `gas/`: backend de Google Apps Script vinculado a la hoja de control.
+- `assets/js/api.js`: transporte POST por iframe y `postMessage` para comunicar GitHub Pages con GAS sin exponer datos en la URL.
 - `docs/`: ficha de contingencia imprimible y manual del censista.
 - `.github/workflows/pages.yml`: publicacion automatica de la PWA en GitHub Pages.
 - `tests/`: pruebas de humo Playwright en escritorio y celular.
@@ -43,6 +44,8 @@ En carpetas sincronizadas de Google Drive conviene ejecutar `npm ci` en una copi
 La demostracion local se habilita en `http://127.0.0.1:4173/?demo=1` con cedula `1234567` y PIN `1234`. El modo demo solo usa datos del navegador.
 
 ## Backend y primer administrador
+
+La instalacion operativa ya tiene una cuenta administrativa provisionada en la hoja privada. Su contrasena se administra fuera del repositorio y nunca debe incorporarse al frontend, la documentacion o los commits.
 
 1. Ejecutar `clasp push -f` desde la raiz para subir el codigo.
 2. Abrir el proyecto vinculado desde la hoja con la cuenta propietaria.

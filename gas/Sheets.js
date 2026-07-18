@@ -246,6 +246,11 @@ function objects_(sheetName) {
     const object = { __row: index + 2 };
     names.forEach(function (name, position) { object[name] = row[position]; });
     return object;
+  }).filter(function (object) {
+    return names.some(function (name) {
+      const value = object[name];
+      return value !== '' && value !== null && value !== false;
+    });
   });
 }
 

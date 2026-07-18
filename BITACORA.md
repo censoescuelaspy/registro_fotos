@@ -43,8 +43,27 @@ Crear una PWA separada para capturar y organizar fotografias del piloto CIALPA, 
 - La hoja en linea contiene las nueve pestanas normalizadas y conserva configuracion regional `es_PY` con zona horaria `America/Asuncion`.
 - La pestana `ESCUELAS` contiene las 86 instituciones piloto de Capital y Central.
 - Se activo el workflow de GitHub Pages despues de autorizar el alcance `workflow` para la cuenta colaboradora.
-- `secureStorage` retiro el permiso publico de edicion de la hoja y mantuvo privada la carpeta de fotografias. El backend del propietario continuo respondiendo despues del cambio.
-- La cuenta colaboradora perdio el acceso indirecto que provenia del enlace publico. Para futuras subidas con `clasp`, el propietario debe compartir explicitamente el proyecto Apps Script con el mantenedor, sin reabrir la hoja a cualquiera con el enlace.
+- `secureStorage` retiro el permiso publico de edicion de la hoja y mantuvo privada la carpeta de fotografias.
+- Al cerrar el permiso por enlace, la cuenta mantenedora perdio temporalmente acceso a la hoja y el backend no pudo inicializarla. El propietario restauro el servicio compartiendo la hoja de forma privada con `dmeza.py@gmail.com` como editor, sin reabrir el acceso general.
+
+### Correccion CORS v1.0.3
+
+- El smoke test de la URL publica detecto que el navegador bloqueaba las respuestas `ContentService` de Apps Script por CORS, aunque el endpoint respondia correctamente por HTTP directo.
+- El frontend envia ahora las solicitudes mediante un formulario POST oculto; GAS devuelve una respuesta HTML minima por `postMessage`, limitada a origenes autorizados.
+- PIN, token, metadatos y fotos permanecen en el cuerpo POST y no se colocan en parametros de URL.
+- Se conserva la respuesta JSON para clientes POST existentes que no usan el transporte iframe.
+- Validacion local: sintaxis de 13 archivos JavaScript y 12/12 pruebas Playwright aprobadas en escritorio y Pixel 7, incluido el puente anti-CORS.
+- El puente fue ampliado para reconocer los subdominios HTTPS dinamicos que usa HtmlService, manteniendo la comprobacion de origen y el identificador unico de solicitud.
+
+### Cierre operativo v1.0.4
+
+- Backend GAS actualizado sobre el mismo enlace de produccion, deployment `@11`; responde `200`, `ok: true`, version `1.0.4` y `bootstrapRequired: false`.
+- Cuenta administrativa provisionada en la hoja privada con usuario fijo, rol `ADMIN` y credencial almacenada solo como hash salado. La contrasena no se guarda en el repositorio.
+- El formulario de acceso acepta el usuario administrativo o la cedula numerica de cada censista.
+- Se corrigio el conteo de filas vacias con casillas de verificacion: el panel administrativo informa un usuario real, no las 999 filas preparadas de la hoja.
+- Prueba real contra produccion aprobada: salud, inicio de sesion, carga de las 86 escuelas, panel administrativo y cierre de sesion, sin errores de navegador.
+- Validacion local final: sintaxis de 18 archivos JavaScript y 14/14 pruebas Playwright aprobadas en escritorio y Pixel 7.
+- Frontend `1.0.4` preparado para publicacion automatica en GitHub Pages.
 
 ### Seguridad
 

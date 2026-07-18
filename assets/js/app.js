@@ -204,10 +204,10 @@ function renderAccess() {
         ${backendProblem ? `<div class="alert alert-warning">${icon('cloud-alert')}<span>No se pudo verificar el servicio de sincronizacion. Revise la conexion antes de trabajar.</span><button type="button" class="btn btn-secondary" data-action="reload">${icon('refresh-cw')} Reintentar</button></div>` : ''}
         ${APP_CONFIG.demo ? `<div class="alert alert-info">${icon('flask-conical')} Prueba local: cedula <strong>1234567</strong>, PIN <strong>1234</strong>.</div>` : ''}
         <form data-form="login" class="form-stack">
-          <label>Codigo de censista / cedula
-            <input name="codigoCensista" inputmode="numeric" autocomplete="username" required minlength="5" maxlength="12" placeholder="Solo numeros">
+          <label>Usuario o cedula
+            <input name="codigoCensista" autocomplete="username" required minlength="5" maxlength="12" pattern="admin|[Aa][Dd][Mm][Ii][Nn]|[0-9]{5,12}" placeholder="admin o numero de cedula">
           </label>
-          <label>PIN
+          <label>Contrasena / PIN
             <div class="input-with-action">
               <input name="pin" type="password" inputmode="numeric" autocomplete="current-password" required minlength="4" maxlength="12">
               <button type="button" class="icon-btn" data-action="toggle-pin" title="Mostrar u ocultar PIN">${icon('eye')}</button>
@@ -674,7 +674,7 @@ async function handleSubmit(event) {
 
 async function login(form) {
   const data = Object.fromEntries(new FormData(form));
-  data.codigoCensista = digits(data.codigoCensista);
+  data.codigoCensista = loginCode(data.codigoCensista);
   const session = await api.login(data);
   setSession(session);
   await loadBootstrap();
@@ -1118,6 +1118,11 @@ function calculateRecordId(draft) {
 }
 
 function digits(value) { return String(value || '').replace(/\D/g, ''); }
+
+function loginCode(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return normalized === 'admin' ? normalized : digits(normalized);
+}
 
 function spaceOptions(selected) {
   const options = [

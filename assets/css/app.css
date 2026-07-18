@@ -163,6 +163,8 @@ p { color: var(--muted); }
 .status-dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red-700); }
 .status-dot.online::before { background: var(--green-700); }
 .alert { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 16px; padding: 11px 12px; border-radius: 6px; font-size: 0.86rem; line-height: 1.4; }
+.alert > span { flex: 1; min-width: 170px; }
+.alert .btn { min-height: 32px; margin-left: auto; padding: 5px 9px; }
 .alert-warning { color: #744000; background: var(--amber-100); border: 1px solid #efc56a; }
 .alert-info { color: var(--navy-950); background: var(--navy-100); border: 1px solid #94b8d7; }
 .access-details { margin-top: 18px; border-top: 1px solid var(--line); }

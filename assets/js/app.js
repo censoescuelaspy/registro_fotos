@@ -178,7 +178,7 @@ function renderFatal(error) {
 }
 
 function renderAccess() {
-  const backendProblem = state.health?.ok === false && state.health?.error?.code === 'BACKEND_NOT_CONFIGURED';
+  const backendProblem = state.health?.ok === false;
   return `<main class="access-layout">
     <section class="access-brand" aria-label="CIALPA Registro de fotos">
       <img src="./assets/img/logo.png" alt="CIALPA" class="access-logo">
@@ -201,7 +201,7 @@ function renderAccess() {
           </div>
           <span class="status-dot ${state.online ? 'online' : 'offline'}">${state.online ? 'En linea' : 'Sin conexion'}</span>
         </div>
-        ${backendProblem ? `<div class="alert alert-warning">${icon('settings')} El servicio esta pendiente de publicar. El modo local de prueba usa <strong>?demo=1</strong>.</div>` : ''}
+        ${backendProblem ? `<div class="alert alert-warning">${icon('cloud-alert')}<span>No se pudo verificar el servicio de sincronizacion. Revise la conexion antes de trabajar.</span><button type="button" class="btn btn-secondary" data-action="reload">${icon('refresh-cw')} Reintentar</button></div>` : ''}
         ${APP_CONFIG.demo ? `<div class="alert alert-info">${icon('flask-conical')} Prueba local: cedula <strong>1234567</strong>, PIN <strong>1234</strong>.</div>` : ''}
         <form data-form="login" class="form-stack">
           <label>Codigo de censista / cedula

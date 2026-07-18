@@ -99,3 +99,9 @@ Recuperar para la app fotografica las capacidades operativas valiosas de la app 
 - GAS publicado sobre el mismo enlace estable, deployment `@13`.
 - Verificacion HTTP: `ok: true`, version `1.1.0`, esquema `2026-07-18.1` y `bootstrapRequired: false`.
 - No se modificaron asignaciones ni registros reales durante las pruebas automatizadas.
+
+### Publicacion publica
+
+- Commit funcional `1002c20` publicado en `main`; workflow GitHub Pages `29661359216` finalizado correctamente.
+- Smoke test en `https://censoescuelaspy.github.io/registro_fotos/`: version `1.1.0`, backend en linea, sin advertencias ni errores de consola.
+- Vista movil publica verificada con 86 escuelas, 86 filas logisticas, pestañas administrativas operativas y sin desborde horizontal.

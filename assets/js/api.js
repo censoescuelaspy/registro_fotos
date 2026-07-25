@@ -43,6 +43,7 @@ function demoData() {
         codigoCensista: '2345678',
         nombres: 'Ana',
         apellidos: 'Lopez',
+        equipo: 'Equipo 1',
         telefono: '0981000001',
         rol: 'ENCUESTADOR',
         activo: true
@@ -51,6 +52,7 @@ function demoData() {
         codigoCensista: '3456789',
         nombres: 'Bruno',
         apellidos: 'Diaz',
+        equipo: 'Equipo 2',
         telefono: '0981000002',
         rol: 'ENCUESTADOR',
         activo: true

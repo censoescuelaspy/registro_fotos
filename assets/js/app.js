@@ -22,7 +22,7 @@ const database = new LocalDatabase();
 const operationsViews = new Set(['admin', 'surveyors', 'logistics', 'requests']);
 const savedPlanningSettings = loadJson('cialpa-fotos-planning-settings-v1') || {};
 const INCIDENT_REPORT_TEMPLATE = [
-  'Usuario / cedula (sin PIN):',
+  'Codigo operativo / cedula (sin PIN):',
   'Codigo MEC:',
   'Registro B/P/E/H:',
   'Fecha y hora:',
@@ -239,10 +239,10 @@ function renderAccess() {
           <span class="status-dot ${state.online ? 'online' : 'offline'}">${state.online ? 'En linea' : 'Sin conexion'}</span>
         </div>
         ${backendProblem ? `<div class="alert alert-warning">${icon('cloud-alert')}<span>No se pudo verificar el servicio de sincronizacion. Revise la conexion antes de trabajar.</span><button type="button" class="btn btn-secondary" data-action="reload">${icon('refresh-cw')} Reintentar</button></div>` : ''}
-        ${APP_CONFIG.demo ? `<div class="alert alert-info">${icon('flask-conical')} Prueba local: cedula <strong>1234567</strong>, PIN <strong>1234</strong>.</div>` : ''}
+        ${APP_CONFIG.demo ? `<div class="alert alert-info">${icon('flask-conical')} Prueba local: codigo <strong>1234567</strong>, PIN <strong>1234</strong>.</div>` : ''}
         <form data-form="login" class="form-stack">
-          <label>Usuario o cedula
-            <input name="codigoCensista" autocomplete="username" required minlength="5" maxlength="12" pattern="admin|[Aa][Dd][Mm][Ii][Nn]|[0-9]{5,12}" placeholder="admin o numero de cedula">
+          <label>Usuario, codigo operativo o cedula
+            <input name="codigoCensista" autocomplete="username" required minlength="5" maxlength="12" pattern="admin|[Aa][Dd][Mm][Ii][Nn]|[0-9]{5,12}" placeholder="admin, codigo operativo o cedula">
           </label>
           <label>Contrasena / PIN
             <div class="input-with-action">
@@ -255,7 +255,7 @@ function renderAccess() {
         <details class="access-details">
           <summary>Solicitar acceso</summary>
           <form data-form="request-access" class="form-grid two-cols">
-            <label>Codigo / cedula<input name="codigoCensista" inputmode="numeric" required maxlength="12"></label>
+            <label>Codigo operativo / cedula<input name="codigoCensista" inputmode="numeric" required maxlength="12"></label>
           <label>Telefono<input name="telefono" inputmode="tel" maxlength="30"></label>
           <label>Nombres<input name="nombres" required maxlength="80"></label>
           <label>Apellidos<input name="apellidos" required maxlength="80"></label>
@@ -267,7 +267,7 @@ function renderAccess() {
           <summary>Crear primer administrador</summary>
           <form data-form="bootstrap-admin" class="form-grid two-cols">
             <label>Clave inicial<input name="bootstrapKey" type="password" required></label>
-            <label>Codigo / cedula<input name="codigoCensista" inputmode="numeric" required></label>
+            <label>Codigo operativo / cedula<input name="codigoCensista" inputmode="numeric" required></label>
             <label>Nombres<input name="nombres" required></label>
             <label>Apellidos<input name="apellidos" required></label>
             <label>PIN nuevo<input name="pin" type="password" inputmode="numeric" minlength="4" maxlength="12" required></label>
@@ -665,8 +665,8 @@ function renderAdmin() {
       <div><span>Fotos</span><strong>${counts.fotos || 0}</strong></div>
       <div><span>Solicitudes pendientes</span><strong>${counts.solicitudesPendientes || 0}</strong></div>
     </div>
-    <section class="content-section"><div class="section-heading"><div><h2>Avance por censista</h2><p>Carga recibida y escuelas asignadas.</p></div><button class="btn btn-secondary" data-view="surveyors">${icon('users')} Administrar</button></div>
-      <div class="data-table-wrap"><table><thead><tr><th>Censista</th><th>Escuelas</th><th>Registros</th><th>Finalizados</th><th>Con pendientes</th><th>Fotos</th><th>Ultima carga</th></tr></thead><tbody>${(state.admin.surveyorSummary || []).filter((item) => item.rol !== 'ADMIN').map((item) => `<tr><td><strong>${escapeHtml(displayName(item))}</strong><br><small>${escapeHtml(item.codigoCensista)}</small></td><td>${item.escuelasAsignadas || 0}</td><td>${item.registros || 0}</td><td>${item.finalizados || 0}</td><td>${item.conPendientes || 0}</td><td>${item.fotos || 0}</td><td>${formatDateTime(item.ultimaCarga)}</td></tr>`).join('') || '<tr><td colspan="7">Aun no hay censistas registrados.</td></tr>'}</tbody></table></div>
+    <section class="content-section"><div class="section-heading"><div><h2>Avance por censista</h2><p>Carga recibida, equipo y escuelas asignadas.</p></div><button class="btn btn-secondary" data-view="surveyors">${icon('users')} Administrar</button></div>
+      <div class="data-table-wrap"><table><thead><tr><th>Censista</th><th>Equipo</th><th>Escuelas</th><th>Registros</th><th>Finalizados</th><th>Con pendientes</th><th>Fotos</th><th>Ultima carga</th></tr></thead><tbody>${(state.admin.surveyorSummary || []).filter((item) => item.rol !== 'ADMIN').map((item) => `<tr><td><strong>${escapeHtml(displayName(item))}</strong><br><small>${escapeHtml(item.codigoCensista)}</small></td><td>${escapeHtml(item.equipo || 'Sin equipo')}</td><td>${item.escuelasAsignadas || 0}</td><td>${item.registros || 0}</td><td>${item.finalizados || 0}</td><td>${item.conPendientes || 0}</td><td>${item.fotos || 0}</td><td>${formatDateTime(item.ultimaCarga)}</td></tr>`).join('') || '<tr><td colspan="8">Aun no hay censistas registrados.</td></tr>'}</tbody></table></div>
     </section>
     <section class="content-section"><div class="section-heading"><div><h2>Registros recientes</h2><p>Ultimas cargas de todos los usuarios.</p></div></div>
       <div class="data-table-wrap"><table><thead><tr><th>Registro</th><th>Escuela</th><th>Censista</th><th>Estado</th><th>Fotos</th><th>Actualizacion</th></tr></thead><tbody>${(state.admin.records || []).slice(0, 50).map((record) => `<tr><td><strong>${escapeHtml(record.recordId)}</strong></td><td>${escapeHtml(record.codigoEscuela)}</td><td>${escapeHtml(record.codigoCensista)}</td><td><span class="status-pill status-${String(record.estado || 'PENDIENTE').toLowerCase()}">${statusLabel(record.estado)}</span></td><td>${record.cantidadFotos || 0}</td><td>${formatDateTime(record.updatedAt || record.syncedAt)}</td></tr>`).join('') || '<tr><td colspan="6">Aun no hay registros.</td></tr>'}</tbody></table></div>
@@ -682,7 +682,7 @@ function renderSurveyors() {
   const summaries = new Map((state.admin.surveyorSummary || []).map((item) => [String(item.codigoCensista), item]));
   const search = state.adminFilters.surveyorSearch.trim().toLocaleLowerCase('es');
   const filtered = users.filter((item) => {
-    const haystack = `${item.codigoCensista} ${item.nombres} ${item.apellidos} ${item.telefono}`.toLocaleLowerCase('es');
+    const haystack = `${item.codigoCensista} ${item.nombres} ${item.apellidos} ${item.telefono} ${item.equipo}`.toLocaleLowerCase('es');
     return (!search || haystack.includes(search))
       && (!state.adminFilters.surveyorRole || item.rol === state.adminFilters.surveyorRole)
       && (!state.adminFilters.surveyorStatus || (state.adminFilters.surveyorStatus === 'ACTIVO') === Boolean(item.activo));
@@ -700,30 +700,31 @@ function renderSurveyors() {
     </div>
     ${currentUser.rol === 'ADMIN' ? renderUserEditor(editing) : ''}
     <section class="content-section"><div class="operations-filters">
-      <label class="search-field">${icon('search')}<input data-admin-filter="surveyorSearch" value="${escapeHtml(state.adminFilters.surveyorSearch)}" placeholder="Cedula, nombre o telefono..."></label>
+      <label class="search-field">${icon('search')}<input data-admin-filter="surveyorSearch" value="${escapeHtml(state.adminFilters.surveyorSearch)}" placeholder="Codigo, nombre, equipo o telefono..."></label>
       <select data-admin-filter="surveyorRole" aria-label="Filtrar por rol"><option value="">Todos los roles</option>${['ENCUESTADOR', 'SUPERVISOR', 'ADMIN'].map((role) => `<option value="${role}" ${state.adminFilters.surveyorRole === role ? 'selected' : ''}>${roleLabel(role)}</option>`).join('')}</select>
       <select data-admin-filter="surveyorStatus" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="ACTIVO" ${state.adminFilters.surveyorStatus === 'ACTIVO' ? 'selected' : ''}>Activos</option><option value="INACTIVO" ${state.adminFilters.surveyorStatus === 'INACTIVO' ? 'selected' : ''}>Inactivos</option></select>
     </div>
-    <div class="data-table-wrap"><table><thead><tr><th>Usuario</th><th>Rol</th><th>Estado</th><th>Escuelas</th><th>Registros</th><th>Fotos</th><th>Ultimo acceso</th><th>Acciones</th></tr></thead><tbody>${filtered.map((item) => {
+    <div class="data-table-wrap"><table><thead><tr><th>Usuario</th><th>Equipo</th><th>Rol</th><th>Estado</th><th>Escuelas</th><th>Registros</th><th>Fotos</th><th>Ultimo acceso</th><th>Acciones</th></tr></thead><tbody>${filtered.map((item) => {
       const summary = summaries.get(String(item.codigoCensista)) || {};
       const protectedAdmin = item.codigoCensista === 'admin'
         || (item.rol === 'ADMIN' && item.codigoCensista === currentUser.codigoCensista);
-      return `<tr><td><span class="table-user"><span class="avatar small">${escapeHtml(initials(item))}</span><span><strong>${escapeHtml(displayName(item))}</strong><small>${escapeHtml(item.codigoCensista)}${item.telefono ? ` · ${escapeHtml(item.telefono)}` : ''}</small></span></span></td><td>${roleLabel(item.rol)}</td><td><span class="status-pill ${item.activo ? 'status-finalizado' : 'status-pendiente'}">${item.activo ? 'Activo' : 'Inactivo'}</span></td><td>${summary.escuelasAsignadas || 0}</td><td>${summary.registros || 0}</td><td>${summary.fotos || 0}</td><td>${formatDateTime(item.ultimoAcceso)}</td><td><div class="table-actions">${currentUser.rol === 'ADMIN' && !protectedAdmin ? `<button class="icon-btn" data-action="edit-user" data-user="${escapeHtml(item.codigoCensista)}" title="Editar usuario" aria-label="Editar ${escapeHtml(displayName(item))}">${icon('pencil')}</button><button class="icon-btn ${item.activo ? 'danger' : ''}" data-action="toggle-user" data-user="${escapeHtml(item.codigoCensista)}" data-active="${item.activo ? 'false' : 'true'}" title="${item.activo ? 'Desactivar' : 'Activar'} usuario" aria-label="${item.activo ? 'Desactivar' : 'Activar'} ${escapeHtml(displayName(item))}">${icon(item.activo ? 'user-x' : 'user-check')}</button>` : `<span class="protected-label">${protectedAdmin ? `${icon('lock-keyhole', 14)} Protegido` : 'Solo lectura'}</span>`}</div></td></tr>`;
-    }).join('') || '<tr><td colspan="8">No hay usuarios con estos filtros.</td></tr>'}</tbody></table></div>
+      return `<tr><td><span class="table-user"><span class="avatar small">${escapeHtml(initials(item))}</span><span><strong>${escapeHtml(displayName(item))}</strong><small>${escapeHtml(item.codigoCensista)}${item.telefono ? ` · ${escapeHtml(item.telefono)}` : ''}</small></span></span></td><td>${escapeHtml(item.equipo || 'Sin equipo')}</td><td>${roleLabel(item.rol)}</td><td><span class="status-pill ${item.activo ? 'status-finalizado' : 'status-pendiente'}">${item.activo ? 'Activo' : 'Inactivo'}</span></td><td>${summary.escuelasAsignadas || 0}</td><td>${summary.registros || 0}</td><td>${summary.fotos || 0}</td><td>${formatDateTime(item.ultimoAcceso)}</td><td><div class="table-actions">${currentUser.rol === 'ADMIN' && !protectedAdmin ? `<button class="icon-btn" data-action="edit-user" data-user="${escapeHtml(item.codigoCensista)}" title="Editar usuario" aria-label="Editar ${escapeHtml(displayName(item))}">${icon('pencil')}</button><button class="icon-btn ${item.activo ? 'danger' : ''}" data-action="toggle-user" data-user="${escapeHtml(item.codigoCensista)}" data-active="${item.activo ? 'false' : 'true'}" title="${item.activo ? 'Desactivar' : 'Activar'} usuario" aria-label="${item.activo ? 'Desactivar' : 'Activar'} ${escapeHtml(displayName(item))}">${icon(item.activo ? 'user-x' : 'user-check')}</button>` : `<span class="protected-label">${protectedAdmin ? `${icon('lock-keyhole', 14)} Protegido` : 'Solo lectura'}</span>`}</div></td></tr>`;
+    }).join('') || '<tr><td colspan="9">No hay usuarios con estos filtros.</td></tr>'}</tbody></table></div>
     </section>
   </section>`;
 }
 
 function renderUserEditor(editing) {
-  const user = editing || { codigoCensista: '', nombres: '', apellidos: '', telefono: '', rol: 'ENCUESTADOR', activo: true };
-  return `<section class="content-section user-editor" id="user-editor"><div class="section-heading"><div><h2>${editing ? 'Editar usuario' : 'Nuevo encuestador'}</h2><p>El codigo del censista corresponde a su numero de cedula.</p></div>${editing ? `<button class="icon-btn" data-action="cancel-user-edit" title="Cancelar edicion" aria-label="Cancelar edicion">${icon('x')}</button>` : ''}</div>
+  const user = editing || { codigoCensista: '', nombres: '', apellidos: '', telefono: '', rol: 'ENCUESTADOR', equipo: '', activo: true };
+  return `<section class="content-section user-editor" id="user-editor"><div class="section-heading"><div><h2>${editing ? 'Editar usuario' : 'Nuevo encuestador'}</h2><p>Use el codigo operativo entregado al censista o su cedula, segun la definicion administrativa.</p></div>${editing ? `<button class="icon-btn" data-action="cancel-user-edit" title="Cancelar edicion" aria-label="Cancelar edicion">${icon('x')}</button>` : ''}</div>
     <form data-form="save-user" class="form-grid user-form">
-      <label>Codigo / cedula<input name="codigoCensista" value="${escapeHtml(user.codigoCensista)}" inputmode="numeric" required minlength="5" maxlength="12" ${editing ? 'readonly' : ''}></label>
+      <label>Codigo operativo / cedula<input name="codigoCensista" value="${escapeHtml(user.codigoCensista)}" inputmode="numeric" required minlength="5" maxlength="12" ${editing ? 'readonly' : ''}></label>
       <label>Nombres<input name="nombres" value="${escapeHtml(user.nombres)}" required maxlength="80"></label>
       <label>Apellidos<input name="apellidos" value="${escapeHtml(user.apellidos)}" required maxlength="80"></label>
       <label>Telefono<input name="telefono" value="${escapeHtml(user.telefono || '')}" inputmode="tel" maxlength="30"></label>
       <label>${editing ? 'Nuevo PIN (opcional)' : 'PIN inicial'}<input name="pin" type="password" inputmode="numeric" minlength="4" maxlength="12" ${editing ? '' : 'required'}></label>
       <label>Rol<select name="rol">${['ENCUESTADOR', 'SUPERVISOR', 'ADMIN'].map((role) => `<option value="${role}" ${user.rol === role ? 'selected' : ''}>${roleLabel(role)}</option>`).join('')}</select></label>
+      <label>Equipo<select name="equipo"><option value="">Sin equipo</option>${Array.from({ length: 8 }, (_, index) => `Equipo ${index + 1}`).map((team) => `<option value="${team}" ${user.equipo === team ? 'selected' : ''}>${team}</option>`).join('')}</select></label>
       <label class="checkbox-label"><input name="activo" type="checkbox" ${user.activo !== false ? 'checked' : ''}> Usuario activo</label>
       <button class="btn btn-primary" type="submit">${icon(editing ? 'save' : 'user-plus')} ${editing ? 'Guardar cambios' : 'Crear usuario'}</button>
     </form>
@@ -736,10 +737,10 @@ function renderLogistics() {
   const users = state.admin.users || [];
   const progress = state.bootstrap?.progress || {};
   const assignments = state.logisticsDraft || {};
-  const fieldUsers = users.filter((item) => item.activo && item.rol !== 'ADMIN');
+  const fieldUsers = teamAssignmentOptions(users);
   const changed = changedAssignmentItems(state.logisticsOriginal, assignments, state.catalog);
-  const metrics = logisticsMetrics(state.catalog, users, assignments, progress, state.planningSettings);
-  const workloads = buildWorkloads(users, state.catalog, assignments, progress, state.admin.surveyorSummary || []);
+  const metrics = logisticsMetrics(state.catalog, fieldUsers, assignments, progress, state.planningSettings);
+  const workloads = buildWorkloads(fieldUsers, state.catalog, assignments, progress, state.admin.surveyorSummary || []);
   const departments = [...new Set(state.catalog.map((school) => school.departamento))].sort();
   const districts = [...new Set(state.catalog
     .filter((school) => !state.adminFilters.logisticsDepartment || school.departamento === state.adminFilters.logisticsDepartment)
@@ -765,7 +766,7 @@ function renderLogistics() {
       <div><span>Escuelas</span><strong>${metrics.total}</strong></div><div><span>Pendientes</span><strong>${metrics.pendientes}</strong></div><div><span>Sin asignar</span><strong>${metrics.sinAsignar}</strong></div><div><span>Horas restantes</span><strong>${formatNumber(metrics.horasPendientes, 1)}</strong></div><div><span>Dias estimados</span><strong>${metrics.diasCalendario ?? '—'}</strong></div>
     </div>
     ${changed.length ? `<div class="dirty-banner">${icon('circle-dot')}<span><strong>${changed.length} cambio${changed.length === 1 ? '' : 's'} sin guardar.</strong> La hoja en linea aun no fue modificada.</span></div>` : ''}
-    <section class="content-section"><div class="section-heading"><div><h2>Carga por encuestador</h2><p>${metrics.encuestadoresActivos} activos · ${metrics.encuestadoresNecesarios} necesarios para el plazo indicado · ${formatNumber(metrics.jornadasPersona, 1)} jornadas-persona.</p></div></div>
+    <section class="content-section"><div class="section-heading"><div><h2>Carga por equipo</h2><p>${metrics.encuestadoresActivos} equipos activos · ${metrics.encuestadoresNecesarios} necesarios para el plazo indicado · ${formatNumber(metrics.jornadasPersona, 1)} jornadas-equipo.</p></div></div>
       <div class="workload-grid">${workloads.map((item) => {
         const assignedSchools = state.catalog.filter((school) => assignments[school.codigo] === item.codigoCensista && schoolStatus(progress, school.codigo) !== 'FINALIZADO');
         const routeUrl = googleRouteUrl(assignedSchools);
@@ -777,13 +778,13 @@ function renderLogistics() {
       <select data-admin-filter="logisticsDepartment" aria-label="Departamento"><option value="">Todos los departamentos</option>${departments.map((item) => `<option value="${escapeHtml(item)}" ${state.adminFilters.logisticsDepartment === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select>
       <select data-admin-filter="logisticsDistrict" aria-label="Distrito"><option value="">Todos los distritos</option>${districts.map((item) => `<option value="${escapeHtml(item)}" ${state.adminFilters.logisticsDistrict === item ? 'selected' : ''}>${escapeHtml(item)}</option>`).join('')}</select>
       <select data-admin-filter="logisticsStatus" aria-label="Estado"><option value="">Todos los estados</option>${['PENDIENTE', 'EN_PROCESO', 'FINALIZADO', 'CON_PENDIENTES'].map((item) => `<option value="${item}" ${state.adminFilters.logisticsStatus === item ? 'selected' : ''}>${statusLabel(item)}</option>`).join('')}</select>
-      <select data-admin-filter="logisticsSurveyor" aria-label="Encuestador"><option value="">Todos los encuestadores</option><option value="__UNASSIGNED__" ${state.adminFilters.logisticsSurveyor === '__UNASSIGNED__' ? 'selected' : ''}>Sin asignar</option>${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${state.adminFilters.logisticsSurveyor === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))}</option>`).join('')}</select>
+      <select data-admin-filter="logisticsSurveyor" aria-label="Equipo"><option value="">Todos los equipos</option><option value="__UNASSIGNED__" ${state.adminFilters.logisticsSurveyor === '__UNASSIGNED__' ? 'selected' : ''}>Sin asignar</option>${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${state.adminFilters.logisticsSurveyor === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))}</option>`).join('')}</select>
     </div>
-    <div class="data-table-wrap logistics-table"><table><thead><tr><th>Orden</th><th>Escuela</th><th>Departamento / distrito</th><th>Estado</th><th>Encuestador asignado</th><th>Mapa</th></tr></thead><tbody>${filtered.map((school) => {
+    <div class="data-table-wrap logistics-table"><table><thead><tr><th>Orden</th><th>Escuela</th><th>Departamento / distrito</th><th>Estado</th><th>Equipo asignado</th><th>Mapa</th></tr></thead><tbody>${filtered.map((school) => {
       const assignedCode = String(assignments[school.codigo] || '');
       const originalCode = String(state.logisticsOriginal[school.codigo] || '');
       const assignedUser = users.find((item) => item.codigoCensista === assignedCode);
-      return `<tr class="${assignedCode !== originalCode ? 'is-dirty' : ''}"><td>${school.ordenMuestra || ''}</td><td><strong>${escapeHtml(school.nombre)}</strong><br><small>${escapeHtml(school.codigo)} · ${escapeHtml(school.localidad)}</small></td><td>${escapeHtml(school.departamento)}<br><small>${escapeHtml(school.distrito)}</small></td><td><span class="status-pill status-${schoolStatus(progress, school.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, school.codigo))}</span></td><td><select data-logistics-assignment="${school.codigo}" aria-label="Encuestador para ${escapeHtml(school.nombre)}"><option value="">Sin asignar</option>${assignedUser && !fieldUsers.some((item) => item.codigoCensista === assignedCode) ? `<option value="${escapeHtml(assignedCode)}" selected>${escapeHtml(displayName(assignedUser))} (inactivo)</option>` : ''}${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${assignedCode === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))} · ${escapeHtml(item.codigoCensista)}</option>`).join('')}</select></td><td><a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${school.latitud},${school.longitud}" target="_blank" rel="noopener" title="Ver escuela en Google Maps" aria-label="Ver ${escapeHtml(school.nombre)} en Google Maps">${icon('map-pin')}</a></td></tr>`;
+      return `<tr class="${assignedCode !== originalCode ? 'is-dirty' : ''}"><td>${school.ordenMuestra || ''}</td><td><strong>${escapeHtml(school.nombre)}</strong><br><small>${escapeHtml(school.codigo)} · ${escapeHtml(school.localidad)}</small></td><td>${escapeHtml(school.departamento)}<br><small>${escapeHtml(school.distrito)}</small></td><td><span class="status-pill status-${schoolStatus(progress, school.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, school.codigo))}</span></td><td><select data-logistics-assignment="${school.codigo}" aria-label="Equipo para ${escapeHtml(school.nombre)}"><option value="">Sin asignar</option>${assignedUser && !fieldUsers.some((item) => item.codigoCensista === assignedCode) ? `<option value="${escapeHtml(assignedCode)}" selected>${escapeHtml(displayName(assignedUser))} (inactivo)</option>` : ''}${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${assignedCode === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))}</option>`).join('')}</select></td><td><a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${school.latitud},${school.longitud}" target="_blank" rel="noopener" title="Ver escuela en Google Maps" aria-label="Ver ${escapeHtml(school.nombre)} en Google Maps">${icon('map-pin')}</a></td></tr>`;
     }).join('') || '<tr><td colspan="6">No hay escuelas con estos filtros.</td></tr>'}</tbody></table></div>
     </section>
   </section>`;
@@ -812,7 +813,7 @@ function renderRequests() {
 function renderAccount() {
   const user = state.bootstrap?.user || state.session?.user || {};
   return `<section class="view account-view"><div class="view-heading"><div><p class="eyebrow">Sesion actual</p><h1>Mi cuenta</h1></div></div>
-    <section class="profile-panel"><span class="avatar large">${escapeHtml(initials(user))}</span><div><h2>${escapeHtml(displayName(user))}</h2><p>${escapeHtml(user.codigoCensista)} · ${roleLabel(user.rol)}</p></div></section>
+    <section class="profile-panel"><span class="avatar large">${escapeHtml(initials(user))}</span><div><h2>${escapeHtml(displayName(user))}</h2><p>${escapeHtml(user.codigoCensista)} · ${roleLabel(user.rol)}${user.equipo ? ` · ${escapeHtml(user.equipo)}` : ''}</p></div></section>
     <section class="content-section settings-list">
       <div><span>${icon('smartphone')}<b>Dispositivo</b></span><code>${escapeHtml(getDeviceId().slice(0, 13))}...</code></div>
       <div><span>${icon('database')}<b>Catalogo</b></span><span>${state.catalog.length} escuelas · ${escapeHtml(state.catalogMeta?.scope || '')}</span></div>
@@ -1182,6 +1183,7 @@ async function toggleUser(code, active) {
     apellidos: user.apellidos,
     telefono: user.telefono || '',
     rol: user.rol,
+    equipo: user.equipo || '',
     activo: active
   });
   if (state.editingUserCode === user.codigoCensista) state.editingUserCode = '';
@@ -1209,7 +1211,7 @@ function balanceLogistics() {
   if (!confirm('Se redistribuiran en el borrador todas las escuelas no finalizadas. ¿Continuar?')) return;
   const balanced = balancePendingAssignments(
     state.catalog,
-    state.admin?.users || [],
+    teamAssignmentOptions(state.admin?.users || []),
     state.logisticsDraft,
     state.bootstrap?.progress || {}
   );
@@ -1676,6 +1678,37 @@ function roleLabel(role = '') {
 
 function displayName(user = {}) {
   return [user.nombres, user.apellidos].filter(Boolean).join(' ') || user.codigoCensista || 'Usuario';
+}
+
+function teamAssignmentOptions(users = []) {
+  const active = users.filter((item) => item.activo && item.rol === 'ENCUESTADOR');
+  const teams = new Map();
+  const ungrouped = [];
+  active.forEach((user) => {
+    const team = String(user.equipo || '').trim();
+    if (!team) {
+      ungrouped.push(user);
+      return;
+    }
+    if (!teams.has(team)) teams.set(team, []);
+    teams.get(team).push(user);
+  });
+  const grouped = [...teams.entries()]
+    .sort((left, right) => left[0].localeCompare(right[0], 'es', { numeric: true }))
+    .map(([team, members]) => {
+      const sorted = [...members]
+        .sort((left, right) => String(left.codigoCensista).localeCompare(String(right.codigoCensista)));
+      const representative = sorted[0];
+      return {
+        ...representative,
+        nombres: team,
+        apellidos: sorted.map((member) => displayName(member)).join(' / '),
+        telefono: '',
+        equipo: team,
+        memberCodes: sorted.map((member) => String(member.codigoCensista))
+      };
+    });
+  return [...grouped, ...ungrouped];
 }
 
 function initials(user = {}) {

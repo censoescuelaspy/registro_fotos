@@ -44,6 +44,7 @@ function adminDashboard_(session) {
       nombres: String(user.nombres || ''),
       apellidos: String(user.apellidos || ''),
       rol: String(user.rol || ''),
+      equipo: String(user.equipo || ''),
       escuelasAsignadas: 0,
       registros: 0,
       finalizados: 0,
@@ -53,8 +54,17 @@ function adminDashboard_(session) {
     };
   });
   assignments.filter(function (item) { return active_(item.activo); }).forEach(function (item) {
-    const summary = summaryMap[String(item.codigo_censista)];
-    if (summary) summary.escuelasAsignadas += 1;
+    const owner = users.filter(function (user) {
+      return String(user.codigo_censista) === String(item.codigo_censista);
+    })[0];
+    const team = owner ? String(owner.equipo || '').trim() : '';
+    users.forEach(function (user) {
+      const sameOwner = String(user.codigo_censista) === String(item.codigo_censista);
+      const sameTeam = team && String(user.equipo || '').trim() === team;
+      if (!sameOwner && !sameTeam) return;
+      const summary = summaryMap[String(user.codigo_censista)];
+      if (summary) summary.escuelasAsignadas += 1;
+    });
   });
   records.forEach(function (record) {
     const summary = summaryMap[String(record.codigo_censista)];
@@ -89,6 +99,10 @@ function saveUser_(input, session, client) {
   requireRole_(session, [ROLE.ADMIN]);
   const code = digits_(input.codigoCensista, 'codigo de censista', 5, 12);
   const role = requireIn_(input.rol, [ROLE.SURVEYOR, ROLE.SUPERVISOR, ROLE.ADMIN], 'rol');
+  const team = text_(input.equipo, 'equipo', 30, false);
+  if (team && !/^Equipo [1-8]$/.test(team)) {
+    throw apiError_('VALIDATION_ERROR', 'El equipo debe estar entre Equipo 1 y Equipo 8.');
+  }
   const existing = objects_(SHEETS.USERS).filter(function (user) {
     return String(user.codigo_censista) === code;
   })[0];
@@ -107,9 +121,13 @@ function saveUser_(input, session, client) {
     telefono: text_(input.telefono, 'telefono', 30, false),
     created_at: existing ? existing.created_at : now,
     updated_at: now,
-    ultimo_acceso: existing ? existing.ultimo_acceso : ''
+    ultimo_acceso: existing ? existing.ultimo_acceso : '',
+    equipo: team
   });
-  audit_(session, existing ? 'ACTUALIZAR_USUARIO' : 'CREAR_USUARIO', 'USUARIO', code, { rol: role }, client);
+  audit_(session, existing ? 'ACTUALIZAR_USUARIO' : 'CREAR_USUARIO', 'USUARIO', code, {
+    rol: role,
+    equipo: team
+  }, client);
   return { ok: true };
 }
 
@@ -278,7 +296,8 @@ function reviewAccess_(payload, session, client) {
       telefono: request.telefono,
       created_at: existing ? existing.created_at : now,
       updated_at: now,
-      ultimo_acceso: existing ? existing.ultimo_acceso : ''
+      ultimo_acceso: existing ? existing.ultimo_acceso : '',
+      equipo: existing ? existing.equipo : ''
     });
   }
   upsertObject_(SHEETS.REQUESTS, 'solicitud_id', requestId, {

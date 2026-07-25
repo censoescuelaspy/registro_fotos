@@ -1,5 +1,38 @@
 # Bitacora
 
+## 2026-07-25 - Equipos y asignaciones definitivas v1.3.0
+
+### Objetivo
+
+Incorporar a la appweb la nomina operativa y la distribucion de escuelas definida en el plan piloto, respetando que la unidad de trabajo es la construccion y que ambos integrantes de cada equipo deben acceder a la misma carga.
+
+### Implementado
+
+- Matriz reproducible de 16 censistas, 8 equipos, 85 ubicaciones fisicas y 86 codigos escolares.
+- Codigos operativos no personales para el alta inicial; no se publican cedulas, PIN ni credenciales en GitHub Pages.
+- Campo `equipo` incorporado al esquema de usuarios, a la administracion y al tablero.
+- Acceso compartido por equipo a escuelas, avance y registros, manteniendo autoria individual de cada carga.
+- Logistica y exportacion CSV presentadas por equipo e integrantes.
+- El local compartido por dos codigos escolares queda como una sola visita fisica y bajo el mismo equipo.
+- Flujo seguro de activacion: cada censista solicita acceso con su codigo operativo y elige su propio PIN; la aprobacion administrativa conserva su equipo y asignaciones.
+
+### Fuentes operativas
+
+- `R04_PLAN OPERATIVO PLAN PILOTO_EQUIPOS Y CRONOGRAMA (1).xlsx`.
+- `LISTADO_ESCUELAS_CIALPA_CODIGO_AULAS_2026-07-22.xlsx`, hoja `Edificios_85`.
+- `R02_LISTADO DE PERSONAL.pdf`, usado solamente para verificar nombres; no se incorporaron datos personales adicionales.
+
+### Validacion y publicacion
+
+- Conciliacion reproducible aprobada: 8 equipos, 16 usuarios, 85 sitios y 86 codigos.
+- Hoja privada verificada con 16 usuarios activos, 8 equipos y 86 asignaciones activas unicas.
+- Respaldos ocultos creados antes de la carga: `backup_usuarios_pre_equipos_20260725` y `backup_asignaciones_pre_equipos_20260725`.
+- Sintaxis JavaScript aprobada para frontend y backend.
+- Playwright: `26/26` recorridos aprobados en Chrome de escritorio y movil.
+- Auditoria de dependencias de produccion: `0` vulnerabilidades.
+- Backend GAS desplegado como version `14`; endpoint saludable con app `1.3.0` y esquema `2026-07-25.1`.
+- Frontend pendiente de publicacion y verificacion final en GitHub Pages.
+
 ## 2026-07-25 - Guia operativa y cierre controlado v1.2.0
 
 ### Objetivo

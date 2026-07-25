@@ -4,7 +4,7 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 
 ## Flujo de campo
 
-1. El censista ingresa con su cedula y PIN; el administrador usa su nombre de usuario reservado.
+1. El censista ingresa con el codigo operativo asignado o su cedula y el PIN que registra mediante una solicitud aprobada; el administrador usa su nombre de usuario reservado.
 2. Abre una escuela asignada desde el mapa o la lista.
 3. Repite los numeros de la ficha en papel.
 4. Selecciona el tipo y numero de elemento y abre la camara.
@@ -16,14 +16,14 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 
 - **Mi jornada** muestra avance personal, siguiente escuela, borradores, cola local y registros sincronizados.
 - **Control** consolida escuelas finalizadas, registros, fotos, solicitudes y avance por censista.
-- **Encuestadores** permite al administrador crear, editar, activar y desactivar usuarios; la cuenta administrativa principal permanece protegida.
-- **Logistica** permite filtrar por territorio, estado y censista, estimar jornadas, comparar cargas, proponer un balanceo, preparar rutas, deshacer cambios y guardar asignaciones por lote.
+- **Encuestadores** muestra los 16 integrantes y su pertenencia a los 8 equipos; permite al administrador crear, editar, activar y desactivar usuarios, mientras la cuenta administrativa principal permanece protegida.
+- **Logistica** administra la distribucion por equipo, filtra por territorio y estado, compara cargas, prepara rutas y guarda asignaciones por lote.
 - **Solicitudes** mantiene una bandeja separada por estado para aprobar o rechazar accesos.
 - **Guia de campo** integra las cuatro reglas de control, la secuencia fotografica, la recuperacion sin conexion, los errores criticos y una plantilla copiable para incidencias.
 - El cierre evita marcar **Finalizado** sin GPS y exige explicar en **Observaciones** cualquier registro **Con pendientes**.
-- El CSV logistico conserva escuela, ubicacion, estado y censista para coordinacion externa.
+- El CSV logistico conserva escuela, ubicacion, estado, equipo e integrantes para coordinacion externa.
 
-Los cambios realizados en **Logistica** son un borrador hasta pulsar **Guardar cambios**. Al confirmar, queda una sola asignacion activa por escuela y las asignaciones anteriores permanecen inactivas como historial.
+Los cambios realizados en **Logistica** son un borrador hasta pulsar **Guardar cambios**. Al confirmar, queda una sola asignacion activa por escuela a nombre del representante operativo del equipo; los dos integrantes del mismo equipo reciben acceso a las mismas escuelas. Las asignaciones anteriores permanecen inactivas como historial.
 
 Ejemplo de identificador:
 
@@ -37,6 +37,7 @@ El mismo codigo se usa en la imagen, el nombre del archivo, Google Drive y Googl
 
 - `index.html`, `assets/`, `sw.js`: PWA estatica para GitHub Pages.
 - `assets/data/pilot-schools.json`: catalogo vigente de 86 escuelas piloto de Capital y Central.
+- `tools/build_team_roster.py`: reconstruccion verificable de 16 censistas, 8 equipos, 85 ubicaciones fisicas y 86 codigos escolares desde los documentos operativos.
 - `gas/`: backend de Google Apps Script vinculado a la hoja de control.
 - `assets/js/api.js`: transporte POST por iframe y `postMessage` para comunicar GitHub Pages con GAS sin exponer datos en la URL.
 - `assets/js/operations.js`: filtros, metricas, balanceo, rutas y exportacion de la operacion territorial.
@@ -56,7 +57,7 @@ py -3 tools/generate_contingency_presentation.py
 
 En carpetas sincronizadas de Google Drive conviene ejecutar `npm ci` en una copia local temporal y no versionar `node_modules`.
 
-La demostracion local se habilita en `http://127.0.0.1:4173/?demo=1` con cedula `1234567` y PIN `1234`. El modo demo solo usa datos del navegador.
+La demostracion local se habilita en `http://127.0.0.1:4173/?demo=1` con codigo `1234567` y PIN `1234`. El modo demo solo usa datos del navegador.
 
 ## Backend y primer administrador
 

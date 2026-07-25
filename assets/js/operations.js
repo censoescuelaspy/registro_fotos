@@ -44,7 +44,13 @@ export function buildWorkloads(users, schools, assignmentMap, progress, summarie
       const assignedCodes = Object.keys(assignmentMap || {})
         .filter((schoolCode) => assignmentMap[schoolCode] === code && schoolByCode.has(schoolCode));
       const finalizadas = assignedCodes.filter((schoolCode) => isFinished(progress, schoolCode)).length;
-      const summary = summaryByUser.get(code) || {};
+      const memberCodes = user.memberCodes || [code];
+      const teamSummaries = memberCodes.map((memberCode) => summaryByUser.get(memberCode) || {});
+      const summary = {
+        registros: teamSummaries.reduce((total, item) => total + Number(item.registros || 0), 0),
+        fotos: teamSummaries.reduce((total, item) => total + Number(item.fotos || 0), 0),
+        ultimaCarga: teamSummaries.map((item) => item.ultimaCarga || '').sort().pop() || ''
+      };
       return {
         ...user,
         asignadas: assignedCodes.length,
@@ -125,7 +131,7 @@ export function logisticsCsv(schools, users, assignmentMap, progress) {
   const userByCode = new Map(users.map((user) => [String(user.codigoCensista), user]));
   const rows = [[
     'codigo_escuela', 'escuela', 'departamento', 'distrito', 'localidad', 'estado',
-    'codigo_censista', 'censista', 'latitud', 'longitud'
+    'codigo_representante', 'equipo_y_censistas', 'latitud', 'longitud'
   ]];
   schools.forEach((school) => {
     const code = String(assignmentMap?.[school.codigo] || '');

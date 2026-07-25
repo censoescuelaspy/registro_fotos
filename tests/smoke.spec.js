@@ -3,7 +3,7 @@ const { test, expect } = require('@playwright/test');
 test.beforeEach(async ({ page }) => {
   await page.goto('/?demo=1');
   await expect(page.getByRole('heading', { name: 'Ingresar' })).toBeVisible();
-  await page.getByLabel('Usuario o cedula').fill('1234567');
+  await page.getByLabel('Usuario, codigo operativo o cedula').fill('1234567');
   await page.getByLabel('Contrasena / PIN', { exact: true }).fill('1234');
   await page.getByRole('button', { name: 'Ingresar' }).click();
   await expect(page.getByRole('heading', { name: 'Escuelas asignadas' })).toBeVisible();
@@ -132,7 +132,7 @@ test('administra encuestadores y conserva la cuenta principal protegida', async 
   await expect(page.getByRole('heading', { name: 'Administrar encuestadores' })).toBeVisible();
   await expect(page.getByText('Protegido', { exact: true })).toBeVisible();
 
-  await page.getByLabel('Codigo / cedula').fill('4567890');
+  await page.getByLabel('Codigo operativo / cedula').fill('4567890');
   await page.getByLabel('Nombres').fill('Carla');
   await page.getByLabel('Apellidos').fill('Benitez');
   await page.getByLabel('Telefono').fill('0981000003');
@@ -141,7 +141,7 @@ test('administra encuestadores y conserva la cuenta principal protegida', async 
   await expect(page.getByText('Carla Benitez', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Editar Carla Benitez' }).click();
   await expect(page.getByRole('heading', { name: 'Editar usuario' })).toBeVisible();
-  await expect(page.getByLabel('Codigo / cedula')).toHaveAttribute('readonly', '');
+  await expect(page.getByLabel('Codigo operativo / cedula')).toHaveAttribute('readonly', '');
 });
 
 test('planifica, filtra, deshace y guarda asignaciones logisticas', async ({ page }) => {

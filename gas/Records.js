@@ -1,6 +1,25 @@
+function activeTeamMemberCodes_(code) {
+  const users = objects_(SHEETS.USERS);
+  const current = users.filter(function (user) {
+    return String(user.codigo_censista) === String(code) && active_(user.activo);
+  })[0];
+  const team = current ? String(current.equipo || '').trim() : '';
+  const allowedCodes = {};
+  allowedCodes[String(code)] = true;
+  if (team) {
+    users.forEach(function (user) {
+      if (active_(user.activo) && String(user.equipo || '').trim() === team) {
+        allowedCodes[String(user.codigo_censista)] = true;
+      }
+    });
+  }
+  return allowedCodes;
+}
+
 function activeAssignmentsFor_(code) {
+  const allowedCodes = activeTeamMemberCodes_(code);
   return objects_(SHEETS.ASSIGNMENTS).filter(function (assignment) {
-    return String(assignment.codigo_censista) === String(code) && active_(assignment.activo);
+    return allowedCodes[String(assignment.codigo_censista)] && active_(assignment.activo);
   });
 }
 
@@ -73,8 +92,9 @@ function photoView_(row) {
 function bootstrap_(session) {
   const assignments = activeAssignmentsFor_(session.codigoCensista);
   const showAll = [ROLE.ADMIN, ROLE.SUPERVISOR].indexOf(session.rol) >= 0;
+  const teamCodes = activeTeamMemberCodes_(session.codigoCensista);
   const records = objects_(SHEETS.RECORDS).filter(function (row) {
-    return showAll || String(row.codigo_censista) === session.codigoCensista;
+    return showAll || teamCodes[String(row.codigo_censista)];
   });
   const progress = {};
   records.forEach(function (record) {
@@ -89,7 +109,8 @@ function bootstrap_(session) {
   });
   return {
     user: publicUser_(session.user),
-    assignedCodes: assignments.map(function (item) { return String(item.codigo_escuela); }),
+    assignedCodes: assignments.map(function (item) { return String(item.codigo_escuela); })
+      .filter(function (code, index, items) { return items.indexOf(code) === index; }),
     showAllSchools: showAll,
     progress: progress,
     recentRecords: records.sort(function (a, b) {
@@ -313,8 +334,11 @@ function listRecords_(payload, session) {
   const schoolFilter = payload && payload.codigoEscuela ? String(payload.codigoEscuela) : '';
   const requestedSurveyor = payload && payload.codigoCensista ? digits_(payload.codigoCensista, 'codigo de censista', 5, 12) : '';
   const surveyorFilter = requestedSurveyor && showAll ? requestedSurveyor : (showAll ? '' : session.codigoCensista);
+  const teamCodes = showAll ? {} : activeTeamMemberCodes_(session.codigoCensista);
   const records = objects_(SHEETS.RECORDS).filter(function (row) {
-    return (!surveyorFilter || String(row.codigo_censista) === surveyorFilter)
+    return (!surveyorFilter || (showAll
+      ? String(row.codigo_censista) === surveyorFilter
+      : teamCodes[String(row.codigo_censista)]))
       && (!schoolFilter || String(row.codigo_escuela) === schoolFilter);
   });
   const keys = {};

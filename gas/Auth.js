@@ -38,6 +38,7 @@ function publicUser_(row) {
     apellidos: String(row.apellidos || ''),
     telefono: String(row.telefono || ''),
     rol: String(row.rol || ''),
+    equipo: String(row.equipo || ''),
     activo: active_(row.activo),
     createdAt: row.created_at || '',
     updatedAt: row.updated_at || '',
@@ -73,7 +74,8 @@ function bootstrapAdmin_(payload, client) {
     telefono: '',
     created_at: now,
     updated_at: now,
-    ultimo_acceso: ''
+    ultimo_acceso: '',
+    equipo: ''
   });
   setConfigValue_('bootstrap_key', '', 'Consumida al crear el primer administrador');
   setConfigValue_('bootstrap_completed_at', now, 'Fecha de creacion del primer administrador');
@@ -83,7 +85,9 @@ function bootstrapAdmin_(payload, client) {
 
 function requestAccess_(payload, client) {
   const code = digits_(payload.codigoCensista, 'codigo de censista', 5, 12);
-  if (objects_(SHEETS.USERS).some(function (user) { return String(user.codigo_censista) === code && active_(user.activo); })) {
+  if (objects_(SHEETS.USERS).some(function (user) {
+    return String(user.codigo_censista) === code && active_(user.activo) && String(user.pin_hash || '');
+  })) {
     throw apiError_('USER_EXISTS', 'El usuario ya existe. Intente ingresar o contacte al administrador.');
   }
   const pin = validatePin_(payload.pin);

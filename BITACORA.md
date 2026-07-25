@@ -31,7 +31,10 @@ Incorporar a la appweb la nomina operativa y la distribucion de escuelas definid
 - Playwright: `26/26` recorridos aprobados en Chrome de escritorio y movil.
 - Auditoria de dependencias de produccion: `0` vulnerabilidades.
 - Backend GAS desplegado como version `14`; endpoint saludable con app `1.3.0` y esquema `2026-07-25.1`.
-- Frontend pendiente de publicacion y verificacion final en GitHub Pages.
+- Commit funcional: `88a7af2`.
+- GitHub Pages: flujo `30166659567` completado correctamente.
+- URL publica verificada con HTTP `200`, frontend `1.3.0`, logistica por equipo y nueva etiqueta de acceso.
+- Smoke test publico movil aprobado, sin desborde horizontal ni errores de consola.
 
 ## 2026-07-25 - Guia operativa y cierre controlado v1.2.0
 

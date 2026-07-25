@@ -19,6 +19,13 @@
 8. Registre danos y fallas en el campo correspondiente y use el codigo `DF` en el croquis.
 9. Pulse **Finalizar y sincronizar**. Antes de retirarse, compruebe que **Pendientes** indique cero o que todo quede guardado en cola.
 
+## Controles antes del cierre
+
+- Para usar **Finalizado**, obtenga primero el GPS del registro.
+- Si selecciona **Con pendientes**, escriba en **Observaciones** que falta y cual es la accion requerida.
+- Revise la secuencia recomendada: contexto, posicion, detalle y foto de la hoja cuando corresponda.
+- Abra **Guia de campo** desde el boton de ayuda para consultar la recuperacion sin conexion y copiar la plantilla de incidencias.
+
 ## Numeracion
 
 El codigo se compone asi:

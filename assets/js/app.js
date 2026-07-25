@@ -21,6 +21,15 @@ const api = new ApiClient();
 const database = new LocalDatabase();
 const operationsViews = new Set(['admin', 'surveyors', 'logistics', 'requests']);
 const savedPlanningSettings = loadJson('cialpa-fotos-planning-settings-v1') || {};
+const INCIDENT_REPORT_TEMPLATE = [
+  'Usuario / cedula (sin PIN):',
+  'Codigo MEC:',
+  'Registro B/P/E/H:',
+  'Fecha y hora:',
+  'Accion realizada:',
+  'Mensaje exacto:',
+  'Conexion y cola pendiente:'
+].join('\n');
 
 const state = {
   catalog: [],
@@ -284,6 +293,7 @@ function renderShell() {
       ['logistics', 'route', 'Logistica'],
       ['requests', 'inbox', 'Solicitudes']
     ] : []),
+    ['guide', 'book-open-check', 'Guia de campo'],
     ['account', 'circle-user-round', 'Cuenta']
   ];
   const mobileNavItems = [
@@ -303,7 +313,7 @@ function renderShell() {
         <button class="icon-btn sync-button ${state.queue.length ? 'has-badge' : ''}" data-action="sync" title="Sincronizar pendientes" aria-label="Sincronizar pendientes">
           ${icon('refresh-cw')}<span class="button-badge">${state.queue.length}</span>
         </button>
-        <a class="icon-btn" href="${APP_CONFIG.manualUrl}" target="_blank" rel="noopener" title="Manual del censista" aria-label="Abrir manual del censista">${icon('circle-help')}</a>
+        <button class="icon-btn" data-view="guide" title="Guia de campo" aria-label="Abrir guia de campo">${icon('circle-help')}</button>
         ${state.installPrompt ? `<button class="btn btn-quiet desktop-only" data-action="install">${icon('download')} Instalar</button>` : ''}
       </div>
     </header>
@@ -342,6 +352,7 @@ function renderCurrentView() {
   if (state.view === 'surveyors') return renderSurveyors();
   if (state.view === 'logistics') return renderLogistics();
   if (state.view === 'requests') return renderRequests();
+  if (state.view === 'guide') return renderGuide();
   if (state.view === 'account') return renderAccount();
   return renderSchools();
 }
@@ -462,6 +473,12 @@ function renderRegister() {
       </section>
       <section class="form-panel photo-panel">
         <div class="panel-heading"><span class="step-number">2</span><div><h2>Fotografias</h2><p>Cada imagen conservara el identificador del registro.</p></div><span class="count-badge">${draft.photos.length}</span></div>
+        <div class="photo-sequence" aria-label="Secuencia fotografica recomendada">
+          <span><b>1</b> Contexto</span><i aria-hidden="true">→</i>
+          <span><b>2</b> Posicion</span><i aria-hidden="true">→</i>
+          <span><b>3</b> Detalle</span><i aria-hidden="true">→</i>
+          <span><b>4</b> Hoja</span>
+        </div>
         <div class="element-fields">
           <label>Elemento fotografiado
             <select name="tipoElemento" required>${elementOptions(draft.tipoElemento)}</select>
@@ -495,6 +512,7 @@ function renderRegister() {
           <label>Observaciones<textarea name="observaciones" rows="3" maxlength="1000">${escapeHtml(draft.observaciones)}</textarea></label>
           <label>Danos y fallas<textarea name="danosFallas" rows="3" maxlength="1000">${escapeHtml(draft.danosFallas)}</textarea></label>
         </div>
+        ${renderCompletionChecklist(draft)}
       </section>
       <div class="record-actions">
         <div><strong>${draft.photos.length} foto${draft.photos.length === 1 ? '' : 's'}</strong><small>${state.online ? 'Se sincronizara al finalizar' : 'Quedara en cola hasta recuperar conexion'}</small></div>
@@ -540,7 +558,7 @@ function renderPhotoItem(photo, index) {
   if (photo.synced) {
     return `<article class="photo-item is-synced" data-photo-id="${photo.fotoId}">
       <div class="photo-thumb synced-thumb"><span>${icon(photo.tipoFoto === 'HOJA_PAPEL' ? 'scan-line' : 'image-check')}</span></div>
-      <div class="photo-copy"><strong>${escapeHtml(photo.codigoFoto)}</strong><small>${escapeHtml(elementLabel(photo.tipoElemento))} ${escapeHtml(photo.numeroElemento || '')} · ${formatBytes(photo.bytes)}</small><span class="synced-label">${icon('cloud-check', 14)} Sincronizada</span></div>
+      <div class="photo-copy"><strong>${escapeHtml(photo.codigoFoto)}</strong><small>${escapeHtml(elementLabel(photo.tipoElemento))} ${escapeHtml(photo.numeroElemento || '')} · ${formatBytes(photo.bytes)}</small><span class="synced-label">${icon('cloud-upload', 14)} Sincronizada</span></div>
     </article>`;
   }
   return `<article class="photo-item" data-photo-id="${photo.fotoId}">
@@ -582,7 +600,7 @@ function renderPending() {
     </section>
     <section class="content-section">
       <div class="section-heading"><div><h2>Cola de sincronizacion</h2><p>Se procesa en orden: primero el registro y luego sus fotos.</p></div></div>
-      <div class="queue-list">${state.queue.length ? state.queue.map(renderQueueRow).join('') : renderEmpty('cloud-check', 'Todo esta sincronizado.', 'No quedan datos pendientes en este celular.')}</div>
+      <div class="queue-list">${state.queue.length ? state.queue.map(renderQueueRow).join('') : renderEmpty('cloud-upload', 'Todo esta sincronizado.', 'No quedan datos pendientes en este celular.')}</div>
     </section>
     <section class="content-section">
       <div class="section-heading"><div><h2>Registros sincronizados</h2><p>Puede reabrir un registro propio para agregar evidencia sin perder su numeracion.</p></div></div>
@@ -605,7 +623,7 @@ function renderQueueRow(item) {
 function renderSyncedRecordRow(record) {
   const school = schoolByCode(record.codigoEscuela);
   const own = record.codigoCensista === (state.bootstrap?.user || state.session?.user || {}).codigoCensista;
-  return `<article class="list-card"><div class="list-card-icon">${icon('cloud-check')}</div><div><strong>${escapeHtml(record.recordId)}</strong><span>${escapeHtml(school?.nombre || record.codigoEscuela)} · ${record.cantidadFotos || 0} fotos</span><small>${statusLabel(record.estado)} · ${formatDateTime(record.updatedAt || record.syncedAt)}</small></div>${own ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="continue-record" data-record="${escapeHtml(record.recordKey)}">${icon('pencil')} Continuar</button></div>` : ''}</article>`;
+  return `<article class="list-card"><div class="list-card-icon">${icon('cloud-upload')}</div><div><strong>${escapeHtml(record.recordId)}</strong><span>${escapeHtml(school?.nombre || record.codigoEscuela)} · ${record.cantidadFotos || 0} fotos</span><small>${statusLabel(record.estado)} · ${formatDateTime(record.updatedAt || record.syncedAt)}</small></div>${own ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="continue-record" data-record="${escapeHtml(record.recordKey)}">${icon('pencil')} Continuar</button></div>` : ''}</article>`;
 }
 
 function operationsAllowed() {
@@ -800,12 +818,103 @@ function renderAccount() {
       <div><span>${icon('database')}<b>Catalogo</b></span><span>${state.catalog.length} escuelas · ${escapeHtml(state.catalogMeta?.scope || '')}</span></div>
       <div><span>${icon('cloud')}<b>Sincronizacion</b></span><span>${state.queue.length ? `${state.queue.length} pendientes` : 'Al dia'}</span></div>
       <div><span>${icon('app-window')}<b>Version</b></span><span>${APP_CONFIG.version} · ${APP_CONFIG.buildDate}</span></div>
-      <a href="${APP_CONFIG.manualUrl}" target="_blank" rel="noopener"><span>${icon('book-open-check')}<b>Manual del censista</b></span><span>Abrir hoja 2</span></a>
+      <button type="button" data-view="guide"><span>${icon('list-checks')}<b>Guia operativa</b></span><span>Abrir en la app</span></button>
+      <a href="${APP_CONFIG.trainingManualUrl}" target="_blank" rel="noopener"><span>${icon('presentation')}<b>Manual de capacitacion</b></span><span>35 diapositivas</span></a>
+      <a href="${APP_CONFIG.manualUrl}" target="_blank" rel="noopener"><span>${icon('book-open-check')}<b>Manual rapido</b></span><span>Abrir hoja 2</span></a>
       <a href="${APP_CONFIG.printableFormUrl}" target="_blank" rel="noopener"><span>${icon('printer')}<b>Ficha de contingencia</b></span><span>Imprimir hoja 1</span></a>
     </section>
     ${state.installPrompt ? `<button class="btn btn-primary" data-action="install">${icon('download')} Instalar en este dispositivo</button>` : ''}
     <button class="btn btn-danger" data-action="logout">${icon('log-out')} Cerrar sesion</button>
   </section>`;
+}
+
+function renderGuide() {
+  const user = state.bootstrap?.user || state.session?.user || {};
+  const isSupervisor = ['ADMIN', 'SUPERVISOR'].includes(user.rol);
+  return `<section class="view guide-view">
+    <div class="view-heading">
+      <div><p class="eyebrow">Ayuda operativa</p><h1>Guia de campo</h1><p>Consulta rapida para registrar, revisar y sincronizar sin perder trazabilidad.</p></div>
+      <a class="btn btn-secondary" href="${APP_CONFIG.trainingManualUrl}" target="_blank" rel="noopener">${icon('presentation')} Manual completo</a>
+    </div>
+    <section class="guide-hero">
+      <div>
+        <span class="guide-kicker">${isSupervisor ? 'SUPERVISION' : 'TRABAJO DE CAMPO'}</span>
+        <h2>${isSupervisor ? 'Controle por excepcion y asegure la recuperacion.' : 'Revise antes de salir de la escuela.'}</h2>
+        <p>${isSupervisor
+          ? 'Priorice pendientes, duplicados, falta de carga reciente y cambios de asignacion.'
+          : 'Una escuela correcta, un codigo coherente, una foto util y la cola en cero.'}</p>
+      </div>
+      <button class="btn btn-primary" type="button" data-view="${isSupervisor ? 'admin' : 'register'}">${icon(isSupervisor ? 'layout-dashboard' : 'camera')} ${isSupervisor ? 'Ir a Control' : 'Ir a Registrar'}</button>
+    </section>
+    <section class="guide-rule-grid" aria-label="Reglas esenciales">
+      ${guideRule('1', 'Escuela correcta', 'Compare codigo MEC, nombre y asignacion.', 'school')}
+      ${guideRule('2', 'Codigo unico', 'Ficha, app y fotografias deben coincidir.', 'scan-line')}
+      ${guideRule('3', 'Foto util', 'Contexto, enfoque, pertinencia y privacidad.', 'camera')}
+      ${guideRule('4', 'Cola en cero', 'Confirme la sincronizacion antes del cierre.', 'cloud-upload')}
+    </section>
+    <section class="guide-grid">
+      <article class="content-section guide-card">
+        <div class="section-heading"><div><p class="eyebrow">Fotografia</p><h2>Secuencia recomendada</h2></div>${icon('images', 28)}</div>
+        <ol class="guide-steps">
+          <li><b>Contexto</b><span>Vista general del espacio.</span></li>
+          <li><b>Posicion</b><span>Ubicacion del elemento.</span></li>
+          <li><b>Detalle</b><span>Elemento, dano o identificacion.</span></li>
+          <li><b>Hoja</b><span>Completa, plana y legible.</span></li>
+        </ol>
+      </article>
+      <article class="content-section guide-card">
+        <div class="section-heading"><div><p class="eyebrow">Sin conexion</p><h2>Recuperacion segura</h2></div>${icon('wifi-off', 28)}</div>
+        <ol class="guide-steps">
+          <li><b>Mantenga</b><span>El mismo dispositivo y navegador.</span></li>
+          <li><b>Recupere</b><span>Internet y abra Mi jornada.</span></li>
+          <li><b>Sincronice</b><span>Deje la app abierta durante el envio.</span></li>
+          <li><b>Verifique</b><span>Cero operaciones pendientes.</span></li>
+        </ol>
+      </article>
+      <article class="content-section guide-card">
+        <div class="section-heading"><div><p class="eyebrow">Incidencias</p><h2>Reporte minimo</h2></div>${icon('message-square-warning', 28)}</div>
+        <p>Incluya usuario sin PIN, codigo MEC, B/P/E/H, fecha y hora, accion realizada, mensaje exacto, conexion y cola pendiente.</p>
+        <button class="btn btn-secondary" type="button" data-action="copy-incident-template">${icon('copy')} Copiar plantilla</button>
+      </article>
+      <article class="content-section guide-card guide-card-warning">
+        <div class="section-heading"><div><p class="eyebrow">No hacer</p><h2>Errores criticos</h2></div>${icon('triangle-alert', 28)}</div>
+        <ul>
+          <li>Seleccionar una escuela parecida con otro codigo.</li>
+          <li>Crear otro registro para el mismo B/P/E/H.</li>
+          <li>Compartir PIN o fotografiar personas sin autorizacion.</li>
+          <li>Marcar Finalizado sin GPS y revision completa.</li>
+          <li>Borrar datos del navegador con cola pendiente.</li>
+        </ul>
+      </article>
+    </section>
+    <section class="guide-downloads">
+      <a class="btn btn-secondary" href="${APP_CONFIG.trainingManualUrl}" target="_blank" rel="noopener">${icon('file-down')} Manual de capacitacion</a>
+      <a class="btn btn-secondary" href="${APP_CONFIG.manualUrl}" target="_blank" rel="noopener">${icon('book-open')} Manual rapido</a>
+      <a class="btn btn-secondary" href="${APP_CONFIG.printableFormUrl}" target="_blank" rel="noopener">${icon('printer')} Ficha de contingencia</a>
+    </section>
+  </section>`;
+}
+
+function guideRule(number, title, copy, iconName) {
+  return `<article><span class="guide-rule-number">${number}</span><span class="guide-rule-icon">${icon(iconName, 22)}</span><div><h2>${title}</h2><p>${copy}</p></div></article>`;
+}
+
+function renderCompletionChecklist(draft) {
+  const recordReady = Boolean(calculateRecordId(draft));
+  const hasPhotos = Boolean(draft.photos.length);
+  const hasLocation = Boolean(draft.location);
+  const pendingExplained = draft.estado !== 'CON_PENDIENTES' || String(draft.observaciones || '').trim().length >= 10;
+  const items = [
+    [recordReady, 'Codigo completo'],
+    [hasPhotos, 'Foto agregada'],
+    [hasLocation, 'GPS obtenido'],
+    [pendingExplained, 'Pendiente explicado']
+  ];
+  return `<div class="completion-checklist" aria-label="Control antes del cierre">
+    <strong>${icon('list-checks')} Control antes del cierre</strong>
+    <div>${items.map(([ok, label]) => `<span class="${ok ? 'is-ready' : ''}">${icon(ok ? 'check' : 'minus', 14)} ${label}</span>`).join('')}</div>
+    <small>Para marcar Finalizado se requiere GPS. Si quedan pendientes, describa exactamente que falta.</small>
+  </div>`;
 }
 
 function renderEmpty(iconName, title, copy) {
@@ -922,6 +1031,12 @@ async function finalizeRecord(form) {
   if (!draft.photos.length) throw new Error('Agregue al menos una fotografia antes de finalizar.');
   const recordId = calculateRecordId(draft);
   if (!recordId) throw new Error('Revise los numeros de bloque, piso, espacio y hoja.');
+  if (draft.estado === 'FINALIZADO' && !draft.location) {
+    throw new Error('Obtenga el GPS antes de marcar el registro como Finalizado.');
+  }
+  if (draft.estado === 'CON_PENDIENTES' && String(draft.observaciones || '').trim().length < 10) {
+    throw new Error('Describa en Observaciones que falta y la accion requerida.');
+  }
   draft.recordId = recordId;
   const photoNotes = new Map([...document.querySelectorAll('[data-photo-note]')].map((input) => [input.dataset.photoNote, input.value.trim()]));
   draft.photos = draft.photos.map((photo) => ({ ...photo, notas: photoNotes.get(photo.fotoId) || photo.notas || '' }));
@@ -1202,8 +1317,25 @@ async function handleClick(event) {
   if (action === 'save-logistics') await saveLogistics();
   if (action === 'export-logistics') exportLogistics();
   if (action === 'review-access') await reviewAccess(button.dataset.request, button.dataset.status);
+  if (action === 'copy-incident-template') await copyIncidentTemplate();
   if (action === 'install') await installApp();
   if (action === 'logout') await logout();
+}
+
+async function copyIncidentTemplate() {
+  try {
+    await navigator.clipboard.writeText(INCIDENT_REPORT_TEMPLATE);
+  } catch {
+    const textarea = document.createElement('textarea');
+    textarea.value = INCIDENT_REPORT_TEMPLATE;
+    textarea.setAttribute('readonly', '');
+    textarea.className = 'clipboard-fallback';
+    document.body.append(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+  }
+  toast('Plantilla de incidencia copiada.', 'success');
 }
 
 async function saveActiveDraft() {

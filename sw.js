@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'cialpa-fotos-v1.1.0';
+const CACHE_VERSION = 'cialpa-fotos-v1.2.0';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_ASSETS = [
   './',
@@ -14,6 +14,7 @@ const STATIC_ASSETS = [
   './assets/js/operations.js',
   './assets/data/pilot-schools.json',
   './docs/FICHA_CONTINGENCIA_PLANO_MANUAL_CIALPA_v1.4.pdf',
+  './docs/MANUAL_CAPACITACION_CIALPA_FOTOS_2026-07-25.pdf',
   './assets/img/logo.png',
   './assets/img/favicon.png',
   './assets/img/icon-192.png',

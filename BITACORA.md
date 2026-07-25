@@ -1,5 +1,34 @@
 # Bitacora
 
+## 2026-07-25 - Guia operativa y cierre controlado v1.2.0
+
+### Objetivo
+
+Alinear la appweb con el manual ampliado de capacitacion y evitar cierres que no permitan al supervisor comprender o recuperar el trabajo de campo.
+
+### Implementado
+
+- Nueva **Guia de campo** integrada y adaptada al rol del usuario.
+- Cuatro reglas visibles: escuela correcta, codigo unico, foto util y cola en cero.
+- Secuencia fotografica visible: contexto, posicion, detalle y hoja.
+- Procedimiento offline, errores criticos y plantilla copiable para reportar incidencias sin PIN.
+- Manual de capacitacion de 35 diapositivas incorporado como PDF descargable y disponible offline.
+- Control de cierre: **Finalizado** requiere GPS.
+- Control de pendientes: **Con pendientes** requiere una observacion que describa que falta y la accion esperada.
+- Version de frontend y cache PWA actualizada a `1.2.0`.
+
+### Validacion local
+
+- Sintaxis JavaScript aprobada para la aplicacion, la configuracion y el service worker.
+- Playwright: `26/26` recorridos aprobados en Chrome de escritorio y movil.
+- Revision visual aprobada en `1440 x 1000` y `390 x 844`, sin desborde horizontal ni errores de consola.
+- Auditoria de dependencias de produccion: `0` vulnerabilidades.
+
+### Alcance tecnico
+
+- No se modificaron datos, asignaciones, cuentas, fotos ni estructura del backend.
+- El endpoint GAS estable se conserva sin redeploy porque los cambios son exclusivamente de frontend y documentacion.
+
 ## 2026-07-18 - Version inicial
 
 ### Objetivo

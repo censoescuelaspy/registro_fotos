@@ -19,6 +19,8 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 - **Encuestadores** permite al administrador crear, editar, activar y desactivar usuarios; la cuenta administrativa principal permanece protegida.
 - **Logistica** permite filtrar por territorio, estado y censista, estimar jornadas, comparar cargas, proponer un balanceo, preparar rutas, deshacer cambios y guardar asignaciones por lote.
 - **Solicitudes** mantiene una bandeja separada por estado para aprobar o rechazar accesos.
+- **Guia de campo** integra las cuatro reglas de control, la secuencia fotografica, la recuperacion sin conexion, los errores criticos y una plantilla copiable para incidencias.
+- El cierre evita marcar **Finalizado** sin GPS y exige explicar en **Observaciones** cualquier registro **Con pendientes**.
 - El CSV logistico conserva escuela, ubicacion, estado y censista para coordinacion externa.
 
 Los cambios realizados en **Logistica** son un borrador hasta pulsar **Guardar cambios**. Al confirmar, queda una sola asignacion activa por escuela y las asignaciones anteriores permanecen inactivas como historial.
@@ -39,6 +41,7 @@ El mismo codigo se usa en la imagen, el nombre del archivo, Google Drive y Googl
 - `assets/js/api.js`: transporte POST por iframe y `postMessage` para comunicar GitHub Pages con GAS sin exponer datos en la URL.
 - `assets/js/operations.js`: filtros, metricas, balanceo, rutas y exportacion de la operacion territorial.
 - `docs/`: ficha de contingencia imprimible y manual del censista.
+- `docs/MANUAL_CAPACITACION_CIALPA_FOTOS_2026-07-25.pdf`: material completo de capacitacion para censistas, supervisores y facilitadores.
 - `.github/workflows/pages.yml`: publicacion automatica de la PWA en GitHub Pages.
 - `tests/`: pruebas de humo Playwright en escritorio y celular.
 - `tools/generate_contingency_presentation.py`: fuente reproducible del PPTX editable de dos paginas.

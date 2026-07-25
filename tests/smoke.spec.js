@@ -27,6 +27,18 @@ test('crea un registro con identificador fotografico automatico', async ({ page 
   await expect(page.getByText('Borrador guardado en este celular.')).toBeVisible();
 });
 
+test('muestra la guia operativa y sus recursos de capacitacion', async ({ page }) => {
+  await page.locator('[data-view="guide"]:visible').first().click();
+  await expect(page.getByRole('heading', { name: 'Guia de campo', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Secuencia recomendada' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recuperacion segura' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Copiar plantilla' })).toBeVisible();
+  await expect(page.getByRole('link', { name: /Manual de capacitacion/ })).toHaveAttribute(
+    'href',
+    './docs/MANUAL_CAPACITACION_CIALPA_FOTOS_2026-07-25.pdf'
+  );
+});
+
 test('activa la camara y agrega el identificador al pie de la imagen', async ({ page }) => {
   await page.locator('[data-action="select-school"]').first().click();
   await page.locator('[data-action="start-record"]').click();
@@ -83,6 +95,28 @@ test('reabre un registro sincronizado y continua la secuencia fotografica', asyn
   await expect(page.getByRole('heading', { name: 'Continuar registro' })).toBeVisible();
   await expect(page.locator('.photo-item.is-synced')).toHaveCount(1);
   await expect(page.locator('.photo-id-preview')).toContainText(/-AM01-FT02/);
+});
+
+test('controla GPS al finalizar y explicacion de pendientes', async ({ page }) => {
+  await page.locator('[data-action="select-school"]').first().click();
+  await page.locator('[data-action="start-record"]').click();
+  await page.locator('input[data-photo-input="EVIDENCIA"]').setInputFiles({
+    name: 'control-cierre.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#e7eef4"/></svg>')
+  });
+  await expect(page.locator('.photo-item')).toHaveCount(1);
+  await page.locator('select[name="estado"]').selectOption('FINALIZADO');
+  await expect(page.locator('select[name="estado"]')).toHaveValue('FINALIZADO');
+  await page.getByRole('button', { name: /Finalizar y sincronizar/ }).click();
+  await expect(page.getByText('Obtenga el GPS antes de marcar el registro como Finalizado.')).toBeVisible();
+  await expect(page.locator('#record-form')).toBeVisible();
+
+  await page.locator('select[name="estado"]').selectOption('CON_PENDIENTES');
+  await expect(page.locator('select[name="estado"]')).toHaveValue('CON_PENDIENTES');
+  await page.getByRole('button', { name: /Finalizar y sincronizar/ }).click();
+  await expect(page.getByText('Describa en Observaciones que falta y la accion requerida.')).toBeVisible();
+  await expect(page.locator('#record-form')).toBeVisible();
 });
 
 test('expone control administrativo y resumen por censista', async ({ page }) => {
@@ -151,6 +185,7 @@ test('recorre los modulos operativos sin errores ni desborde de pagina', async (
     ['surveyors', 'Administrar encuestadores'],
     ['logistics', 'Logistica de campo'],
     ['requests', 'Solicitudes'],
+    ['guide', 'Guia de campo'],
     ['account', 'Mi cuenta']
   ];
   for (const [view, heading] of views) {

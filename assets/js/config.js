@@ -1,9 +1,10 @@
 export const APP_CONFIG = Object.freeze({
   appName: 'CIALPA Fotos',
-  version: '1.1.0',
-  buildDate: '2026-07-18',
+  version: '1.2.0',
+  buildDate: '2026-07-25',
   gasExecUrl: 'https://script.google.com/macros/s/AKfycbz8RmR-TqSb3FzaLSgMO2NlTTOfRPWuYjSC5ZyXw1Vr5iL-PBYeDIerNvCVj--hNjYk/exec',
   schoolCatalogUrl: './assets/data/pilot-schools.json',
+  trainingManualUrl: './docs/MANUAL_CAPACITACION_CIALPA_FOTOS_2026-07-25.pdf',
   manualUrl: './docs/FICHA_CONTINGENCIA_PLANO_MANUAL_CIALPA_v1.4.pdf#page=2',
   printableFormUrl: './docs/FICHA_CONTINGENCIA_PLANO_MANUAL_CIALPA_v1.4.pdf#page=1',
   sessionStorageKey: 'cialpa-fotos-session-v1',

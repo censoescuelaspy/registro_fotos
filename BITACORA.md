@@ -29,6 +29,15 @@ Alinear la appweb con el manual ampliado de capacitacion y evitar cierres que no
 - No se modificaron datos, asignaciones, cuentas, fotos ni estructura del backend.
 - El endpoint GAS estable se conserva sin redeploy porque los cambios son exclusivamente de frontend y documentacion.
 
+### Estado de publicacion
+
+- Commit funcional: `0ffb2ce`.
+- GitHub Pages: flujo `30155366204` completado correctamente.
+- URL verificada: `https://censoescuelaspy.github.io/registro_fotos/`.
+- La interfaz publica muestra `v1.2.0`, abre la guia y entrega el manual de capacitacion con HTTP `200`.
+- Smoke test publico aprobado sin errores de consola.
+- Backend GAS verificado en estado saludable, version `1.1.0` y esquema `2026-07-18.1`.
+
 ## 2026-07-18 - Version inicial
 
 ### Objetivo

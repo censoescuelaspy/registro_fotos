@@ -47,6 +47,7 @@ function doPost(event) {
     else if (action === 'listRecords') data = listRecords_(payload, session);
     else if (action === 'adminDashboard') data = adminDashboard_(session);
     else if (action === 'saveUser') data = saveUser_(payload.user || {}, session, client);
+    else if (action === 'setAvailability') data = setAvailability_(payload || {}, session, client);
     else if (action === 'saveAssignment') data = saveAssignment_(payload.assignment || {}, session, client);
     else if (action === 'saveAssignmentsBatch') data = saveAssignmentsBatch_(payload.assignments || [], session, client);
     else if (action === 'reviewAccess') data = reviewAccess_(payload, session, client);

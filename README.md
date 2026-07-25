@@ -14,14 +14,25 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 
 ## Operacion y supervision
 
-- **Mi jornada** muestra avance personal, siguiente escuela, borradores, cola local y registros sincronizados.
-- **Control** consolida escuelas finalizadas, registros, fotos, solicitudes y avance por censista.
+- **Mi jornada** muestra avance personal, siguiente escuela, borradores, cola local, registros sincronizados, tiempos por ficha y KPI propios y del equipo.
+- **Control** consolida escuelas atendidas, registros, fotos, solicitudes, disponibilidad, rendimiento por censista y proyeccion de plazo por equipo.
 - **Encuestadores** muestra los 16 integrantes y su pertenencia a los 8 equipos; permite al administrador crear, editar, activar y desactivar usuarios, mientras la cuenta administrativa principal permanece protegida.
 - **Logistica** administra la distribucion por equipo, filtra por territorio y estado, compara cargas, prepara rutas y guarda asignaciones por lote.
 - **Solicitudes** mantiene una bandeja separada por estado para aprobar o rechazar accesos.
 - **Guia de campo** integra las cuatro reglas de control, la secuencia fotografica, la recuperacion sin conexion, los errores criticos y una plantilla copiable para incidencias.
 - El cierre evita marcar **Finalizado** sin GPS y exige explicar en **Observaciones** cualquier registro **Con pendientes**.
 - El CSV logistico conserva escuela, ubicacion, estado, equipo e integrantes para coordinacion externa.
+
+## Tiempos, KPI y contingencias
+
+- El tiempo de una ficha se mide desde que se abre el registro hasta que se pulsa **Finalizar y guardar en cola**. Incluye pausas y desplazamientos ocurridos durante ese intervalo.
+- El censista ve fichas realizadas, porcentaje completado, fotografias, promedio y mediana por ficha, horas acumuladas y demora media de sincronizacion.
+- El equipo ve integrantes disponibles, escuelas asignadas, atendidas y pendientes, registros, fotografias, promedio, mediana y ultima actividad.
+- Una ausencia se registra como **indisponibilidad de campo** sin desactivar la cuenta. El supervisor indica el motivo y puede restablecer la disponibilidad.
+- La proyeccion usa 45 minutos por escuela y 6 horas efectivas por jornada. La capacidad es `integrantes disponibles / integrantes del equipo`: si falta una persona de un equipo de dos, la capacidad estimada baja al 50 % y el plazo pendiente se duplica; si no queda ninguna, el equipo figura bloqueado.
+- Las fichas históricas que no poseen marcas de inicio y cierre se conservan y muestran **Sin datos** en los indicadores temporales.
+
+La matriz de funcionamiento, respuesta online/offline y contingencias se conserva en `docs/PRUEBAS_CONTINGENCIA_CIALPA_FOTOS_2026-07-25.md`.
 
 Los cambios realizados en **Logistica** son un borrador hasta pulsar **Guardar cambios**. Al confirmar, queda una sola asignacion activa por escuela a nombre del representante operativo del equipo; los dos integrantes del mismo equipo reciben acceso a las mismas escuelas. Las asignaciones anteriores permanecen inactivas como historial.
 

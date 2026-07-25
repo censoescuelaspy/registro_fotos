@@ -14,6 +14,7 @@ import {
   primaryAssignmentMap,
   schoolStatus
 } from './operations.js';
+import { contingencyForecast, minutesLabel } from './performance.js';
 
 const app = document.querySelector('#app');
 const toastRegion = document.querySelector('#toast-region');
@@ -448,7 +449,7 @@ function renderRegister() {
   const recordId = calculateRecordId(draft);
   return `<section class="view view-register">
     <div class="view-heading">
-      <div><p class="eyebrow">Registro progresivo</p><h1>${draft.sourceRecordKey || (draft.draftId && state.drafts.some((item) => item.draftId === draft.draftId)) ? 'Continuar registro' : 'Nuevo registro'}</h1><p>Identificador: <strong class="record-code">${escapeHtml(recordId || 'Complete los numeros requeridos')}</strong></p></div>
+      <div><p class="eyebrow">Registro progresivo</p><h1>${draft.sourceRecordKey || (draft.draftId && state.drafts.some((item) => item.draftId === draft.draftId)) ? 'Continuar registro' : 'Nuevo registro'}</h1><p>Identificador: <strong class="record-code">${escapeHtml(recordId || 'Complete los numeros requeridos')}</strong> · Tiempo transcurrido: <strong>${elapsedMinutesLabel(draft.startedAt)}</strong></p></div>
       <button class="btn btn-secondary" data-action="save-draft">${icon('save')} Guardar borrador</button>
     </div>
     <form id="record-form" data-form="record" class="record-layout" novalidate>
@@ -540,7 +541,10 @@ function newDraft(code = '') {
     danosFallas: '',
     location: null,
     photos: [],
-    createdAt: new Date().toISOString()
+    createdAt: new Date().toISOString(),
+    startedAt: new Date().toISOString(),
+    completedAt: '',
+    durationSeconds: 0
   };
 }
 
@@ -590,6 +594,7 @@ function renderPending() {
       <div><span>En proceso</span><strong>${enProceso}</strong></div>
       <div><span>Pendientes</span><strong>${pendientes}</strong></div>
     </div>
+    ${renderMyPerformance(state.bootstrap?.performance)}
     <section class="content-section next-school-section">
       <div class="section-heading"><div><h2>Proxima escuela</h2><p>${state.location ? 'Sugerida por cercania a su ubicacion actual.' : 'Sugerida segun el orden de la muestra.'}</p></div></div>
       ${nextSchool ? `<article class="next-school-card"><div class="list-card-icon">${icon('school')}</div><div><span class="status-pill status-${schoolStatus(progress, nextSchool.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, nextSchool.codigo))}</span><h3>${escapeHtml(nextSchool.nombre)}</h3><p><strong>${escapeHtml(nextSchool.codigo)}</strong> · ${escapeHtml(nextSchool.distrito)} · ${escapeHtml(nextSchool.localidad)}${Number.isFinite(nextSchool.distanceKm) ? ` · ${nextSchool.distanceKm < 1 ? `${Math.round(nextSchool.distanceKm * 1000)} m` : `${nextSchool.distanceKm.toFixed(1)} km`}` : ''}</p></div><div class="button-row"><button class="btn btn-primary" data-action="start-record" data-school="${nextSchool.codigo}">${icon('camera')} Registrar</button><button class="btn btn-secondary" data-action="show-school" data-school="${nextSchool.codigo}">${icon('map')} Ver en mapa</button><a class="icon-btn" href="https://www.google.com/maps/dir/?api=1&destination=${nextSchool.latitud},${nextSchool.longitud}" target="_blank" rel="noopener" title="Abrir ruta en Google Maps" aria-label="Abrir ruta en Google Maps">${icon('navigation')}</a></div></article>` : renderEmpty('badge-check', 'Jornada completada.', 'No quedan escuelas pendientes en sus asignaciones.')}
@@ -623,7 +628,40 @@ function renderQueueRow(item) {
 function renderSyncedRecordRow(record) {
   const school = schoolByCode(record.codigoEscuela);
   const own = record.codigoCensista === (state.bootstrap?.user || state.session?.user || {}).codigoCensista;
-  return `<article class="list-card"><div class="list-card-icon">${icon('cloud-upload')}</div><div><strong>${escapeHtml(record.recordId)}</strong><span>${escapeHtml(school?.nombre || record.codigoEscuela)} · ${record.cantidadFotos || 0} fotos</span><small>${statusLabel(record.estado)} · ${formatDateTime(record.updatedAt || record.syncedAt)}</small></div>${own ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="continue-record" data-record="${escapeHtml(record.recordKey)}">${icon('pencil')} Continuar</button></div>` : ''}</article>`;
+  return `<article class="list-card"><div class="list-card-icon">${icon('cloud-upload')}</div><div><strong>${escapeHtml(record.recordId)}</strong><span>${escapeHtml(school?.nombre || record.codigoEscuela)} · ${record.cantidadFotos || 0} fotos</span><small>${statusLabel(record.estado)} · ${record.durationSeconds ? minutesLabel(record.durationSeconds / 60) : 'Tiempo no disponible'} · ${formatDateTime(record.updatedAt || record.syncedAt)}</small></div>${own ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="continue-record" data-record="${escapeHtml(record.recordKey)}">${icon('pencil')} Continuar</button></div>` : ''}</article>`;
+}
+
+function renderMyPerformance(performance = {}) {
+  const individual = performance?.individual;
+  const team = performance?.team;
+  if (!individual || !team) {
+    return `<section class="content-section"><div class="section-heading"><div><h2>Mi desempeño</h2><p>Los tiempos apareceran al sincronizar las primeras fichas instrumentadas.</p></div></div></section>`;
+  }
+  const forecast = contingencyForecast({
+    pendingSchools: team.pendingSchools,
+    baseMinutes: state.planningSettings.baseMinutes,
+    hoursPerDay: state.planningSettings.hoursPerDay,
+    totalMembers: team.totalMembers,
+    availableMembers: team.availableMembers
+  });
+  return `<section class="content-section performance-section">
+    <div class="section-heading"><div><h2>Mi desempeño</h2><p>Seguimiento individual y de ${escapeHtml(team.equipo)}. El tiempo mide desde que se abre la ficha hasta su cierre.</p></div><span class="status-pill ${individual.disponibleCampo ? 'status-finalizado' : 'status-con_pendientes'}">${individual.disponibleCampo ? 'Disponible' : 'Ausente'}</span></div>
+    <div class="summary-strip">
+      <div><span>Mis fichas</span><strong>${individual.records}</strong><small>${individual.completedRecords} finalizadas</small></div>
+      <div><span>Promedio por ficha</span><strong>${minutesLabel(individual.averageMinutes)}</strong><small>${individual.timedRecords} con tiempo</small></div>
+      <div><span>Mediana</span><strong>${minutesLabel(individual.medianMinutes)}</strong><small>Reduce el efecto de casos extremos</small></div>
+      <div><span>Mis fotos</span><strong>${individual.photos}</strong><small>${individual.completionRate}% finalizadas</small></div>
+      <div><span>Demora de sincronizacion</span><strong>${minutesLabel(individual.averageSyncDelayMinutes)}</strong><small>Incluye trabajo offline</small></div>
+    </div>
+    <div class="summary-strip">
+      <div><span>${escapeHtml(team.equipo)}</span><strong>${team.availableMembers}/${team.totalMembers}</strong><small>integrantes disponibles</small></div>
+      <div><span>Escuelas atendidas</span><strong>${team.touchedSchools}/${team.assignedSchools}</strong><small>${team.pendingSchools} sin iniciar</small></div>
+      <div><span>Promedio del equipo</span><strong>${minutesLabel(team.averageMinutes)}</strong><small>${team.records} fichas</small></div>
+      <div><span>Capacidad actual</span><strong>${Math.round(forecast.capacityFactor * 100)}%</strong><small>${forecast.capacityLossPercent}% de reduccion</small></div>
+      <div><span>Plazo restante</span><strong>${forecast.blocked ? 'Bloqueado' : `${formatNumber(forecast.estimatedDays, 1)} dias`}</strong><small>${forecast.delayDays ? `+${formatNumber(forecast.delayDays, 1)} dias por ausencias` : 'Sin demora por ausencias'}</small></div>
+    </div>
+    ${team.availableMembers < team.totalMembers ? `<div class="alert alert-warning">${icon('triangle-alert')}<span><strong>Contingencia activa:</strong> con ${team.availableMembers} de ${team.totalMembers} integrantes, el plazo se recalcula segun la capacidad disponible.</span></div>` : ''}
+  </section>`;
 }
 
 function operationsAllowed() {
@@ -665,8 +703,9 @@ function renderAdmin() {
       <div><span>Fotos</span><strong>${counts.fotos || 0}</strong></div>
       <div><span>Solicitudes pendientes</span><strong>${counts.solicitudesPendientes || 0}</strong></div>
     </div>
+    ${renderTeamPerformanceAdmin(state.admin.performance)}
     <section class="content-section"><div class="section-heading"><div><h2>Avance por censista</h2><p>Carga recibida, equipo y escuelas asignadas.</p></div><button class="btn btn-secondary" data-view="surveyors">${icon('users')} Administrar</button></div>
-      <div class="data-table-wrap"><table><thead><tr><th>Censista</th><th>Equipo</th><th>Escuelas</th><th>Registros</th><th>Finalizados</th><th>Con pendientes</th><th>Fotos</th><th>Ultima carga</th></tr></thead><tbody>${(state.admin.surveyorSummary || []).filter((item) => item.rol !== 'ADMIN').map((item) => `<tr><td><strong>${escapeHtml(displayName(item))}</strong><br><small>${escapeHtml(item.codigoCensista)}</small></td><td>${escapeHtml(item.equipo || 'Sin equipo')}</td><td>${item.escuelasAsignadas || 0}</td><td>${item.registros || 0}</td><td>${item.finalizados || 0}</td><td>${item.conPendientes || 0}</td><td>${item.fotos || 0}</td><td>${formatDateTime(item.ultimaCarga)}</td></tr>`).join('') || '<tr><td colspan="8">Aun no hay censistas registrados.</td></tr>'}</tbody></table></div>
+      <div class="data-table-wrap"><table><thead><tr><th>Censista</th><th>Equipo</th><th>Disponibilidad</th><th>Fichas</th><th>Finalizadas</th><th>Promedio</th><th>Mediana</th><th>Fotos</th><th>Ultima carga</th></tr></thead><tbody>${(state.admin.performance?.individuals || []).map((item) => `<tr><td><strong>${escapeHtml(displayName(item))}</strong><br><small>${escapeHtml(item.codigoCensista)}</small></td><td>${escapeHtml(item.equipo || 'Sin equipo')}</td><td><span class="status-pill ${item.disponibleCampo ? 'status-finalizado' : 'status-con_pendientes'}">${item.disponibleCampo ? 'Disponible' : 'Ausente'}</span></td><td>${item.records || 0}</td><td>${item.completedRecords || 0}</td><td>${minutesLabel(item.averageMinutes)}</td><td>${minutesLabel(item.medianMinutes)}</td><td>${item.photos || 0}</td><td>${formatDateTime(item.lastActivity)}</td></tr>`).join('') || '<tr><td colspan="9">Aun no hay censistas registrados.</td></tr>'}</tbody></table></div>
     </section>
     <section class="content-section"><div class="section-heading"><div><h2>Registros recientes</h2><p>Ultimas cargas de todos los usuarios.</p></div></div>
       <div class="data-table-wrap"><table><thead><tr><th>Registro</th><th>Escuela</th><th>Censista</th><th>Estado</th><th>Fotos</th><th>Actualizacion</th></tr></thead><tbody>${(state.admin.records || []).slice(0, 50).map((record) => `<tr><td><strong>${escapeHtml(record.recordId)}</strong></td><td>${escapeHtml(record.codigoEscuela)}</td><td>${escapeHtml(record.codigoCensista)}</td><td><span class="status-pill status-${String(record.estado || 'PENDIENTE').toLowerCase()}">${statusLabel(record.estado)}</span></td><td>${record.cantidadFotos || 0}</td><td>${formatDateTime(record.updatedAt || record.syncedAt)}</td></tr>`).join('') || '<tr><td colspan="6">Aun no hay registros.</td></tr>'}</tbody></table></div>
@@ -704,12 +743,12 @@ function renderSurveyors() {
       <select data-admin-filter="surveyorRole" aria-label="Filtrar por rol"><option value="">Todos los roles</option>${['ENCUESTADOR', 'SUPERVISOR', 'ADMIN'].map((role) => `<option value="${role}" ${state.adminFilters.surveyorRole === role ? 'selected' : ''}>${roleLabel(role)}</option>`).join('')}</select>
       <select data-admin-filter="surveyorStatus" aria-label="Filtrar por estado"><option value="">Todos los estados</option><option value="ACTIVO" ${state.adminFilters.surveyorStatus === 'ACTIVO' ? 'selected' : ''}>Activos</option><option value="INACTIVO" ${state.adminFilters.surveyorStatus === 'INACTIVO' ? 'selected' : ''}>Inactivos</option></select>
     </div>
-    <div class="data-table-wrap"><table><thead><tr><th>Usuario</th><th>Equipo</th><th>Rol</th><th>Estado</th><th>Escuelas</th><th>Registros</th><th>Fotos</th><th>Ultimo acceso</th><th>Acciones</th></tr></thead><tbody>${filtered.map((item) => {
+    <div class="data-table-wrap"><table><thead><tr><th>Usuario</th><th>Equipo</th><th>Disponibilidad</th><th>Rol</th><th>Estado</th><th>Escuelas</th><th>Registros</th><th>Fotos</th><th>Ultimo acceso</th><th>Acciones</th></tr></thead><tbody>${filtered.map((item) => {
       const summary = summaries.get(String(item.codigoCensista)) || {};
       const protectedAdmin = item.codigoCensista === 'admin'
         || (item.rol === 'ADMIN' && item.codigoCensista === currentUser.codigoCensista);
-      return `<tr><td><span class="table-user"><span class="avatar small">${escapeHtml(initials(item))}</span><span><strong>${escapeHtml(displayName(item))}</strong><small>${escapeHtml(item.codigoCensista)}${item.telefono ? ` · ${escapeHtml(item.telefono)}` : ''}</small></span></span></td><td>${escapeHtml(item.equipo || 'Sin equipo')}</td><td>${roleLabel(item.rol)}</td><td><span class="status-pill ${item.activo ? 'status-finalizado' : 'status-pendiente'}">${item.activo ? 'Activo' : 'Inactivo'}</span></td><td>${summary.escuelasAsignadas || 0}</td><td>${summary.registros || 0}</td><td>${summary.fotos || 0}</td><td>${formatDateTime(item.ultimoAcceso)}</td><td><div class="table-actions">${currentUser.rol === 'ADMIN' && !protectedAdmin ? `<button class="icon-btn" data-action="edit-user" data-user="${escapeHtml(item.codigoCensista)}" title="Editar usuario" aria-label="Editar ${escapeHtml(displayName(item))}">${icon('pencil')}</button><button class="icon-btn ${item.activo ? 'danger' : ''}" data-action="toggle-user" data-user="${escapeHtml(item.codigoCensista)}" data-active="${item.activo ? 'false' : 'true'}" title="${item.activo ? 'Desactivar' : 'Activar'} usuario" aria-label="${item.activo ? 'Desactivar' : 'Activar'} ${escapeHtml(displayName(item))}">${icon(item.activo ? 'user-x' : 'user-check')}</button>` : `<span class="protected-label">${protectedAdmin ? `${icon('lock-keyhole', 14)} Protegido` : 'Solo lectura'}</span>`}</div></td></tr>`;
-    }).join('') || '<tr><td colspan="9">No hay usuarios con estos filtros.</td></tr>'}</tbody></table></div>
+      return `<tr><td><span class="table-user"><span class="avatar small">${escapeHtml(initials(item))}</span><span><strong>${escapeHtml(displayName(item))}</strong><small>${escapeHtml(item.codigoCensista)}${item.telefono ? ` · ${escapeHtml(item.telefono)}` : ''}</small></span></span></td><td>${escapeHtml(item.equipo || 'Sin equipo')}</td><td><span class="status-pill ${item.disponibleCampo !== false ? 'status-finalizado' : 'status-con_pendientes'}">${item.disponibleCampo !== false ? 'Disponible' : 'Ausente'}</span>${item.motivoIndisponibilidad ? `<br><small>${escapeHtml(item.motivoIndisponibilidad)}</small>` : ''}</td><td>${roleLabel(item.rol)}</td><td><span class="status-pill ${item.activo ? 'status-finalizado' : 'status-pendiente'}">${item.activo ? 'Activo' : 'Inactivo'}</span></td><td>${summary.escuelasAsignadas || 0}</td><td>${summary.registros || 0}</td><td>${summary.fotos || 0}</td><td>${formatDateTime(item.ultimoAcceso)}</td><td><div class="table-actions">${item.rol === 'ENCUESTADOR' && item.activo ? `<button class="icon-btn" data-action="toggle-availability" data-user="${escapeHtml(item.codigoCensista)}" data-available="${item.disponibleCampo === false ? 'true' : 'false'}" title="${item.disponibleCampo === false ? 'Marcar disponible' : 'Registrar ausencia'}" aria-label="${item.disponibleCampo === false ? 'Marcar disponible' : 'Registrar ausencia'} de ${escapeHtml(displayName(item))}">${icon(item.disponibleCampo === false ? 'user-check' : 'calendar-off')}</button>` : ''}${currentUser.rol === 'ADMIN' && !protectedAdmin ? `<button class="icon-btn" data-action="edit-user" data-user="${escapeHtml(item.codigoCensista)}" title="Editar usuario" aria-label="Editar ${escapeHtml(displayName(item))}">${icon('pencil')}</button><button class="icon-btn ${item.activo ? 'danger' : ''}" data-action="toggle-user" data-user="${escapeHtml(item.codigoCensista)}" data-active="${item.activo ? 'false' : 'true'}" title="${item.activo ? 'Desactivar' : 'Activar'} usuario" aria-label="${item.activo ? 'Desactivar' : 'Activar'} ${escapeHtml(displayName(item))}">${icon(item.activo ? 'user-x' : 'user-check')}</button>` : protectedAdmin ? `<span class="protected-label">${icon('lock-keyhole', 14)} Protegido</span>` : ''}</div></td></tr>`;
+    }).join('') || '<tr><td colspan="10">No hay usuarios con estos filtros.</td></tr>'}</tbody></table></div>
     </section>
   </section>`;
 }
@@ -725,6 +764,8 @@ function renderUserEditor(editing) {
       <label>${editing ? 'Nuevo PIN (opcional)' : 'PIN inicial'}<input name="pin" type="password" inputmode="numeric" minlength="4" maxlength="12" ${editing ? '' : 'required'}></label>
       <label>Rol<select name="rol">${['ENCUESTADOR', 'SUPERVISOR', 'ADMIN'].map((role) => `<option value="${role}" ${user.rol === role ? 'selected' : ''}>${roleLabel(role)}</option>`).join('')}</select></label>
       <label>Equipo<select name="equipo"><option value="">Sin equipo</option>${Array.from({ length: 8 }, (_, index) => `Equipo ${index + 1}`).map((team) => `<option value="${team}" ${user.equipo === team ? 'selected' : ''}>${team}</option>`).join('')}</select></label>
+      <label class="checkbox-label"><input name="disponibleCampo" type="checkbox" ${user.disponibleCampo !== false ? 'checked' : ''}> Disponible para campo</label>
+      <label>Motivo de ausencia<input name="motivoIndisponibilidad" value="${escapeHtml(user.motivoIndisponibilidad || '')}" maxlength="250" placeholder="Solo si no esta disponible"></label>
       <label class="checkbox-label"><input name="activo" type="checkbox" ${user.activo !== false ? 'checked' : ''}> Usuario activo</label>
       <button class="btn btn-primary" type="submit">${icon(editing ? 'save' : 'user-plus')} ${editing ? 'Guardar cambios' : 'Crear usuario'}</button>
     </form>
@@ -826,6 +867,22 @@ function renderAccount() {
     </section>
     ${state.installPrompt ? `<button class="btn btn-primary" data-action="install">${icon('download')} Instalar en este dispositivo</button>` : ''}
     <button class="btn btn-danger" data-action="logout">${icon('log-out')} Cerrar sesion</button>
+  </section>`;
+}
+
+function renderTeamPerformanceAdmin(performance = {}) {
+  const teams = performance?.teams || [];
+  return `<section class="content-section"><div class="section-heading"><div><h2>KPIs y contingencias por equipo</h2><p>La proyeccion reduce la capacidad en proporcion a los integrantes ausentes. Un integrante de dos equivale al 50%.</p></div></div>
+    <div class="data-table-wrap"><table><thead><tr><th>Equipo</th><th>Disponibles</th><th>Escuelas atendidas</th><th>Fichas</th><th>Promedio</th><th>Mediana</th><th>Capacidad</th><th>Plazo restante</th><th>Efecto de ausencia</th></tr></thead><tbody>${teams.map((team) => {
+      const forecast = contingencyForecast({
+        pendingSchools: team.pendingSchools,
+        baseMinutes: state.planningSettings.baseMinutes,
+        hoursPerDay: state.planningSettings.hoursPerDay,
+        totalMembers: team.totalMembers,
+        availableMembers: team.availableMembers
+      });
+      return `<tr><td><strong>${escapeHtml(team.equipo)}</strong><br><small>${team.members.map((member) => escapeHtml(displayName(member))).join(' / ')}</small></td><td><span class="status-pill ${team.availableMembers === team.totalMembers ? 'status-finalizado' : 'status-con_pendientes'}">${team.availableMembers}/${team.totalMembers}</span></td><td>${team.touchedSchools}/${team.assignedSchools}</td><td>${team.records}</td><td>${minutesLabel(team.averageMinutes)}</td><td>${minutesLabel(team.medianMinutes)}</td><td>${Math.round(forecast.capacityFactor * 100)}%</td><td>${forecast.blocked ? 'Bloqueado' : `${formatNumber(forecast.estimatedDays, 1)} dias`}</td><td>${forecast.blocked ? 'Sin personal disponible' : forecast.delayDays ? `+${formatNumber(forecast.delayDays, 1)} dias` : 'Sin demora'}</td></tr>`;
+    }).join('') || '<tr><td colspan="9">Aun no hay equipos con datos.</td></tr>'}</tbody></table></div>
   </section>`;
 }
 
@@ -1038,6 +1095,10 @@ async function finalizeRecord(form) {
   if (draft.estado === 'CON_PENDIENTES' && String(draft.observaciones || '').trim().length < 10) {
     throw new Error('Describa en Observaciones que falta y la accion requerida.');
   }
+  if (!draft.completedAt) {
+    draft.completedAt = new Date().toISOString();
+    draft.durationSeconds = elapsedSeconds(draft.startedAt, draft.completedAt);
+  }
   draft.recordId = recordId;
   const photoNotes = new Map([...document.querySelectorAll('[data-photo-note]')].map((input) => [input.dataset.photoNote, input.value.trim()]));
   draft.photos = draft.photos.map((photo) => ({ ...photo, notas: photoNotes.get(photo.fotoId) || photo.notas || '' }));
@@ -1102,6 +1163,9 @@ function buildRecordPayload(draft) {
     cantidadFotos: draft.photos.length,
     cantidadHojasPapel: draft.photos.filter((photo) => photo.tipoFoto === 'HOJA_PAPEL').length,
     createdAt: draft.createdAt,
+    startedAt: draft.startedAt || draft.createdAt,
+    completedAt: draft.completedAt || new Date().toISOString(),
+    durationSeconds: Number(draft.durationSeconds || elapsedSeconds(draft.startedAt || draft.createdAt)),
     updatedAt: new Date().toISOString(),
     deviceId: getDeviceId()
   };
@@ -1157,6 +1221,7 @@ async function saveUser(form) {
   const data = Object.fromEntries(new FormData(form));
   data.codigoCensista = digits(data.codigoCensista);
   data.activo = form.elements.activo.checked;
+  data.disponibleCampo = form.elements.disponibleCampo.checked;
   await api.saveUser(data);
   const wasEditing = Boolean(state.editingUserCode);
   state.editingUserCode = '';
@@ -1184,11 +1249,27 @@ async function toggleUser(code, active) {
     telefono: user.telefono || '',
     rol: user.rol,
     equipo: user.equipo || '',
+    disponibleCampo: user.disponibleCampo !== false,
+    motivoIndisponibilidad: user.motivoIndisponibilidad || '',
     activo: active
   });
   if (state.editingUserCode === user.codigoCensista) state.editingUserCode = '';
   await loadAdmin(true);
   toast(`Usuario ${active ? 'activado' : 'desactivado'}.`, 'success');
+}
+
+async function toggleAvailability(code, available) {
+  const user = (state.admin?.users || []).find((item) => String(item.codigoCensista) === String(code));
+  if (!user) throw new Error('No se encontro el censista.');
+  let reason = '';
+  if (!available) {
+    reason = prompt(`Motivo de ausencia de ${displayName(user)}:`, user.motivoIndisponibilidad || '') || '';
+    if (!reason.trim() && !confirm('No se indico un motivo. ¿Registrar igualmente la ausencia?')) return;
+  }
+  await api.setAvailability(code, available, reason.trim());
+  await loadAdmin(true);
+  if (state.bootstrap?.user?.equipo === user.equipo) await loadBootstrap(true);
+  toast(available ? 'Censista marcado como disponible.' : 'Ausencia registrada y plazo recalculado.', 'success');
 }
 
 async function saveLogistics() {
@@ -1310,6 +1391,7 @@ async function handleClick(event) {
     render();
   }
   if (action === 'toggle-user') await toggleUser(button.dataset.user, button.dataset.active === 'true');
+  if (action === 'toggle-availability') await toggleAvailability(button.dataset.user, button.dataset.available === 'true');
   if (action === 'balance-logistics') balanceLogistics();
   if (action === 'undo-logistics') {
     state.logisticsDraft = { ...state.logisticsOriginal };
@@ -1477,7 +1559,10 @@ async function openRemoteRecord(recordKey) {
     danosFallas: record.danosFallas || '',
     location: null,
     photos,
-    createdAt: record.createdAt || new Date().toISOString()
+    createdAt: record.createdAt || new Date().toISOString(),
+    startedAt: record.startedAt || record.createdAt || new Date().toISOString(),
+    completedAt: record.completedAt || '',
+    durationSeconds: Number(record.durationSeconds || 0)
   };
   state.selectedSchoolCode = record.codigoEscuela;
   state.view = 'register';
@@ -1678,6 +1763,19 @@ function roleLabel(role = '') {
 
 function displayName(user = {}) {
   return [user.nombres, user.apellidos].filter(Boolean).join(' ') || user.codigoCensista || 'Usuario';
+}
+
+function elapsedSeconds(startedAt, completedAt = new Date().toISOString()) {
+  const start = new Date(startedAt || '').getTime();
+  const end = new Date(completedAt || '').getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end < start) return 0;
+  return Math.min(604800, Math.max(0, Math.round((end - start) / 1000)));
+}
+
+function elapsedMinutesLabel(startedAt) {
+  const seconds = elapsedSeconds(startedAt);
+  if (seconds < 60) return '< 1 min';
+  return minutesLabel(seconds / 60);
 }
 
 function teamAssignmentOptions(users = []) {

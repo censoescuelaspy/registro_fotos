@@ -110,10 +110,10 @@ function formatSheet_(sheet, columnCount) {
   }
   const widths = {
     CONFIG: [180, 280, 390, 180],
-    USUARIOS: [130, 170, 170, 120, 90, 90, 80, 130, 175, 175, 175],
+    USUARIOS: [130, 170, 170, 120, 90, 90, 80, 130, 175, 175, 175, 110, 110, 260, 175],
     ESCUELAS: [100, 320, 120, 180, 90, 200, 110, 110, 90, 100, 110, 175, 175],
     ASIGNACIONES: [220, 130, 110, 80, 175, 130, 240, 175],
-    REGISTROS: [250, 250, 220, 110, 130, 90, 80, 70, 70, 80, 150, 120, 260, 260, 110, 110, 90, 90, 90, 175, 175, 175, 220],
+    REGISTROS: [250, 250, 220, 110, 130, 90, 80, 70, 70, 80, 150, 120, 260, 260, 110, 110, 90, 90, 90, 175, 175, 175, 220, 175, 175, 110],
     FOTOS: [220, 220, 250, 250, 110, 130, 90, 80, 70, 70, 80, 110, 160, 100, 110, 80, 300, 100, 320, 110, 90, 180, 220, 250, 200, 110, 110, 90, 175, 175, 110, 250, 175],
     SOLICITUDES: [220, 130, 170, 170, 130, 90, 90, 175, 110, 130, 175, 250]
   }[sheet.getName()];
@@ -127,6 +127,7 @@ function applyValidations_() {
   const users = spreadsheet_().getSheetByName(SHEETS.USERS);
   users.getRange(2, headerIndex_(SHEETS.USERS, 'rol'), users.getMaxRows() - 1, 1).setDataValidation(roles);
   users.getRange(2, headerIndex_(SHEETS.USERS, 'activo'), users.getMaxRows() - 1, 1).insertCheckboxes();
+  users.getRange(2, headerIndex_(SHEETS.USERS, 'disponible_campo'), users.getMaxRows() - 1, 1).insertCheckboxes();
   const assignments = spreadsheet_().getSheetByName(SHEETS.ASSIGNMENTS);
   assignments.getRange(2, headerIndex_(SHEETS.ASSIGNMENTS, 'activo'), assignments.getMaxRows() - 1, 1).insertCheckboxes();
   const records = spreadsheet_().getSheetByName(SHEETS.RECORDS);

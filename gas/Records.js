@@ -58,7 +58,10 @@ function recordView_(row) {
     cantidadHojasPapel: Number(row.cantidad_hojas_papel || 0),
     createdAt: row.created_at || '',
     updatedAt: row.updated_at || '',
-    syncedAt: row.synced_at || ''
+    syncedAt: row.synced_at || '',
+    startedAt: row.started_at || '',
+    completedAt: row.completed_at || '',
+    durationSeconds: Number(row.duration_seconds || 0)
   };
 }
 
@@ -115,7 +118,8 @@ function bootstrap_(session) {
     progress: progress,
     recentRecords: records.sort(function (a, b) {
       return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
-    }).slice(0, 20).map(recordView_)
+    }).slice(0, 20).map(recordView_),
+    performance: performanceForUser_(session.codigoCensista)
   };
 }
 
@@ -156,7 +160,10 @@ function validateRecord_(input, session) {
     created_at: text_(input.createdAt, 'fecha de creacion', 40, false) || nowIso_(),
     updated_at: nowIso_(),
     synced_at: nowIso_(),
-    device_id: text_(input.deviceId, 'dispositivo', 100, false)
+    device_id: text_(input.deviceId, 'dispositivo', 100, false),
+    started_at: text_(input.startedAt, 'inicio', 40, false),
+    completed_at: text_(input.completedAt, 'finalizacion', 40, false),
+    duration_seconds: number_(input.durationSeconds, 'duracion', 0, 604800, false)
   };
 }
 

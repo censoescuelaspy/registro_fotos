@@ -37,6 +37,7 @@ function demoData() {
         nombres: 'Administrador',
         apellidos: 'Demostracion',
         rol: 'ADMIN',
+        disponibleCampo: true,
         activo: true
       },
       {
@@ -46,6 +47,7 @@ function demoData() {
         equipo: 'Equipo 1',
         telefono: '0981000001',
         rol: 'ENCUESTADOR',
+        disponibleCampo: true,
         activo: true
       },
       {
@@ -55,6 +57,7 @@ function demoData() {
         equipo: 'Equipo 2',
         telefono: '0981000002',
         rol: 'ENCUESTADOR',
+        disponibleCampo: true,
         activo: true
       }
     ],
@@ -70,6 +73,60 @@ function demoData() {
 
 function saveDemo(data) {
   localStorage.setItem(demoStoreKey, JSON.stringify(data));
+}
+
+function demoPerformance(data) {
+  const individuals = data.users.filter((user) => user.rol !== 'ADMIN').map((user) => {
+    const records = data.records.filter((record) => record.codigoCensista === user.codigoCensista);
+    const durations = records.map((record) => Number(record.durationSeconds || 0)).filter((value) => value > 0);
+    const average = durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length / 60 : 0;
+    const sorted = [...durations].sort((left, right) => left - right);
+    const middle = Math.floor(sorted.length / 2);
+    const median = sorted.length
+      ? (sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2) / 60
+      : 0;
+    const completed = records.filter((record) => record.estado === 'FINALIZADO').length;
+    return {
+      ...user,
+      assignedSchools: data.assignments.filter((item) => item.activo && item.codigoCensista === user.codigoCensista).length,
+      records: records.length,
+      completedRecords: completed,
+      pendingRecords: records.filter((record) => record.estado === 'CON_PENDIENTES').length,
+      completionRate: records.length ? Math.round(completed / records.length * 1000) / 10 : 0,
+      photos: data.photos.filter((photo) => photo.codigoCensista === user.codigoCensista).length,
+      timedRecords: durations.length,
+      averageMinutes: Math.round(average * 10) / 10,
+      medianMinutes: Math.round(median * 10) / 10,
+      totalHours: Math.round(durations.reduce((sum, value) => sum + value, 0) / 360) / 10,
+      averageSyncDelayMinutes: 0,
+      lastActivity: records.map((record) => record.updatedAt || record.syncedAt || '').sort().pop() || ''
+    };
+  });
+  const teams = [...new Set(individuals.map((item) => item.equipo).filter(Boolean))].map((equipo) => {
+    const members = individuals.filter((item) => item.equipo === equipo);
+    const assigned = new Set(members.flatMap((member) => data.assignments
+      .filter((item) => item.activo && item.codigoCensista === member.codigoCensista)
+      .map((item) => item.codigoEscuela)));
+    const touched = new Set(data.records.filter((record) => members.some((member) => member.codigoCensista === record.codigoCensista))
+      .map((record) => record.codigoEscuela));
+    return {
+      equipo,
+      members,
+      totalMembers: members.length,
+      availableMembers: members.filter((member) => member.disponibleCampo !== false).length,
+      assignedSchools: assigned.size,
+      touchedSchools: touched.size,
+      pendingSchools: Math.max(0, assigned.size - touched.size),
+      records: members.reduce((sum, member) => sum + member.records, 0),
+      completedRecords: members.reduce((sum, member) => sum + member.completedRecords, 0),
+      photos: members.reduce((sum, member) => sum + member.photos, 0),
+      timedRecords: members.reduce((sum, member) => sum + member.timedRecords, 0),
+      averageMinutes: members.length ? members.reduce((sum, member) => sum + member.averageMinutes, 0) / members.length : 0,
+      medianMinutes: members.length ? members.reduce((sum, member) => sum + member.medianMinutes, 0) / members.length : 0,
+      lastActivity: members.map((member) => member.lastActivity || '').sort().pop() || ''
+    };
+  });
+  return { generatedAt: new Date().toISOString(), individuals, teams };
 }
 
 async function demoRequest(action, payload = {}) {
@@ -123,12 +180,19 @@ async function demoRequest(action, payload = {}) {
         accumulator[record.codigoEscuela] = current;
         return accumulator;
       }, {});
+      const performance = demoPerformance(data);
+      const individual = performance.individuals.find((item) => item.codigoCensista === user.codigoCensista) || null;
       return {
         user,
         assignedCodes,
         showAllSchools: ['ADMIN', 'SUPERVISOR'].includes(user.rol),
         progress,
-        recentRecords: data.records.slice(-20).reverse()
+        recentRecords: data.records.slice(-20).reverse(),
+        performance: {
+          generatedAt: performance.generatedAt,
+          individual,
+          team: individual ? performance.teams.find((item) => item.equipo === individual.equipo) || null : null
+        }
       };
     }
     case 'saveRecord': {
@@ -183,7 +247,8 @@ async function demoRequest(action, payload = {}) {
         requests: data.requests,
         records: data.records.slice(-100).reverse(),
         surveyorSummary,
-        photoRootUrl: ''
+        photoRootUrl: '',
+        performance: demoPerformance(data)
       };
       }
     case 'saveUser': {
@@ -193,6 +258,15 @@ async function demoRequest(action, payload = {}) {
       else data.users.push(user);
       saveDemo(data);
       return { ok: true };
+    }
+    case 'setAvailability': {
+      const user = data.users.find((item) => item.codigoCensista === payload.codigoCensista);
+      if (!user) throw new ApiError('No se encontro el censista.', 'USER_NOT_FOUND');
+      user.disponibleCampo = payload.disponibleCampo !== false;
+      user.motivoIndisponibilidad = user.disponibleCampo ? '' : String(payload.motivoIndisponibilidad || '');
+      user.disponibilidadUpdatedAt = now;
+      saveDemo(data);
+      return { ok: true, disponibleCampo: user.disponibleCampo };
     }
     case 'saveAssignment': {
       const assignment = payload.assignment;
@@ -355,6 +429,9 @@ export class ApiClient {
   listRecords(filters = {}) { return this.request('listRecords', filters); }
   adminDashboard() { return this.request('adminDashboard'); }
   saveUser(user) { return this.request('saveUser', { user }); }
+  setAvailability(codigoCensista, disponibleCampo, motivoIndisponibilidad = '') {
+    return this.request('setAvailability', { codigoCensista, disponibleCampo, motivoIndisponibilidad });
+  }
   saveAssignment(assignment) { return this.request('saveAssignment', { assignment }); }
   saveAssignmentsBatch(assignments) { return this.request('saveAssignmentsBatch', { assignments }); }
   reviewAccess(solicitudId, estado, notas = '') {

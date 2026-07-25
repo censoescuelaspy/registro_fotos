@@ -173,6 +173,84 @@ test('mantiene solicitudes en una bandeja administrativa separada', async ({ pag
   await expect(page.getByRole('heading', { name: 'Bandeja de solicitudes' })).toBeVisible();
 });
 
+test('conserva la ficha offline y la sincroniza al recuperar conexion', async ({ page, context }) => {
+  await page.locator('[data-action="select-school"]').first().click();
+  await page.locator('[data-action="start-record"]').click();
+  await page.locator('input[data-photo-input="EVIDENCIA"]').setInputFiles({
+    name: 'contingencia-offline.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#eaf0f5"/></svg>')
+  });
+  await context.setOffline(true);
+  await expect(page.getByText('Sin conexion', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: /Finalizar y guardar en cola/ }).click();
+  await expect(page.getByRole('heading', { name: 'Mi jornada' })).toBeVisible();
+  await expect(page.locator('.queue-list .list-card')).toHaveCount(2);
+  await expect(page.getByText('Registro guardado en la cola local.')).toBeVisible();
+
+  await context.setOffline(false);
+  await expect(page.getByText('Todo esta sincronizado.')).toBeVisible({ timeout: 10000 });
+  await expect(page.locator('.queue-list .list-card')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Continuar' })).toBeVisible();
+});
+
+test('recupera un borrador despues de cerrar o recargar la app', async ({ page }) => {
+  await page.locator('[data-action="select-school"]').first().click();
+  await page.locator('[data-action="start-record"]').click();
+  await page.locator('input[name="numeroFormulario"]').fill('77');
+  await page.getByRole('button', { name: 'Guardar borrador' }).click();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Escuelas asignadas' })).toBeVisible();
+  await page.locator('[data-view="pending"]:visible').first().click();
+  await expect(page.getByRole('heading', { name: 'Borradores locales' })).toBeVisible();
+  await expect(page.locator('.draft-list .list-card')).toHaveCount(1);
+  await page.getByRole('button', { name: 'Editar' }).click();
+  await expect(page.locator('input[name="numeroFormulario"]')).toHaveValue('77');
+});
+
+test('registra una ausencia y recalcula la capacidad del equipo', async ({ page }) => {
+  await page.getByRole('button', { name: 'Control' }).click();
+  await page.locator('.operations-tab[data-view="surveyors"]').click();
+  page.on('dialog', async (dialog) => {
+    if (dialog.type() === 'prompt') await dialog.accept('Contingencia de prueba');
+    else await dialog.accept();
+  });
+  await page.getByRole('button', { name: 'Registrar ausencia de Ana Lopez' }).click();
+  await expect(page.getByText('Ausencia registrada y plazo recalculado.')).toBeVisible();
+  await page.locator('.operations-tab[data-view="admin"]').click();
+  await expect(page.getByRole('heading', { name: 'KPIs y contingencias por equipo' })).toBeVisible();
+  await expect(page.getByText('Sin personal disponible')).toBeVisible();
+});
+
+test('controla una respuesta demorada y limpia el transporte temporal', async ({ page }) => {
+  await page.route('https://script.google.com/sin-respuesta', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'text/html; charset=utf-8',
+      body: '<!doctype html><title>Sin respuesta</title>'
+    });
+  });
+  const result = await page.evaluate(async () => {
+    const { ApiClient } = await import('/assets/js/api.js?timeout-test=1');
+    const api = new ApiClient({
+      demo: false,
+      gasExecUrl: 'https://script.google.com/sin-respuesta',
+      version: '1.4.0'
+    });
+    try {
+      await api.request('health', {}, { timeout: 100 });
+      return { code: 'NO_TIMEOUT' };
+    } catch (error) {
+      return {
+        code: error.code,
+        iframes: document.querySelectorAll('iframe[name^="cialpa-gas-"]').length,
+        forms: document.querySelectorAll('form[target^="cialpa-gas-"]').length
+      };
+    }
+  });
+  expect(result).toEqual({ code: 'TIMEOUT', iframes: 0, forms: 0 });
+});
+
 test('recorre los modulos operativos sin errores ni desborde de pagina', async ({ page }) => {
   const errors = [];
   page.on('pageerror', (error) => errors.push(error.message));

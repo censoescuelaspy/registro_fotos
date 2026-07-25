@@ -31,6 +31,10 @@ function active_(value) {
   return value === '' || value == null ? false : boolean_(value);
 }
 
+function fieldAvailable_(value) {
+  return value === '' || value == null ? true : boolean_(value);
+}
+
 function publicUser_(row) {
   return {
     codigoCensista: String(row.codigo_censista || ''),
@@ -39,6 +43,9 @@ function publicUser_(row) {
     telefono: String(row.telefono || ''),
     rol: String(row.rol || ''),
     equipo: String(row.equipo || ''),
+    disponibleCampo: fieldAvailable_(row.disponible_campo),
+    motivoIndisponibilidad: String(row.motivo_indisponibilidad || ''),
+    disponibilidadUpdatedAt: row.disponibilidad_updated_at || '',
     activo: active_(row.activo),
     createdAt: row.created_at || '',
     updatedAt: row.updated_at || '',
@@ -75,7 +82,10 @@ function bootstrapAdmin_(payload, client) {
     created_at: now,
     updated_at: now,
     ultimo_acceso: '',
-    equipo: ''
+    equipo: '',
+    disponible_campo: true,
+    motivo_indisponibilidad: '',
+    disponibilidad_updated_at: now
   });
   setConfigValue_('bootstrap_key', '', 'Consumida al crear el primer administrador');
   setConfigValue_('bootstrap_completed_at', now, 'Fecha de creacion del primer administrador');

@@ -91,7 +91,8 @@ function adminDashboard_(session) {
     records: records.sort(function (a, b) {
       return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
     }).slice(0, 200).map(recordView_),
-    photoRootUrl: configValue_('photo_root_folder_url', '')
+    photoRootUrl: configValue_('photo_root_folder_url', ''),
+    performance: performanceDashboard_()
   };
 }
 
@@ -122,13 +123,44 @@ function saveUser_(input, session, client) {
     created_at: existing ? existing.created_at : now,
     updated_at: now,
     ultimo_acceso: existing ? existing.ultimo_acceso : '',
-    equipo: team
+    equipo: team,
+    disponible_campo: input.disponibleCampo !== false,
+    motivo_indisponibilidad: input.disponibleCampo === false
+      ? text_(input.motivoIndisponibilidad, 'motivo de indisponibilidad', 250, false)
+      : '',
+    disponibilidad_updated_at: now
   });
   audit_(session, existing ? 'ACTUALIZAR_USUARIO' : 'CREAR_USUARIO', 'USUARIO', code, {
     rol: role,
     equipo: team
   }, client);
   return { ok: true };
+}
+
+function setAvailability_(input, session, client) {
+  requireRole_(session, [ROLE.ADMIN, ROLE.SUPERVISOR]);
+  const code = digits_(input.codigoCensista, 'codigo de censista', 5, 12);
+  const user = objects_(SHEETS.USERS).filter(function (item) {
+    return String(item.codigo_censista) === code && active_(item.activo);
+  })[0];
+  if (!user || String(user.rol) !== ROLE.SURVEYOR) {
+    throw apiError_('USER_NOT_FOUND', 'El censista no existe o no esta activo.');
+  }
+  const available = input.disponibleCampo !== false;
+  const now = nowIso_();
+  upsertObject_(SHEETS.USERS, 'codigo_censista', code, {
+    disponible_campo: available,
+    motivo_indisponibilidad: available
+      ? ''
+      : text_(input.motivoIndisponibilidad, 'motivo de indisponibilidad', 250, false),
+    disponibilidad_updated_at: now,
+    updated_at: now
+  });
+  audit_(session, 'CAMBIAR_DISPONIBILIDAD', 'USUARIO', code, {
+    disponibleCampo: available,
+    motivo: available ? '' : text_(input.motivoIndisponibilidad, 'motivo', 250, false)
+  }, client);
+  return { ok: true, disponibleCampo: available };
 }
 
 function saveAssignment_(input, session, client) {
@@ -297,7 +329,10 @@ function reviewAccess_(payload, session, client) {
       created_at: existing ? existing.created_at : now,
       updated_at: now,
       ultimo_acceso: existing ? existing.ultimo_acceso : '',
-      equipo: existing ? existing.equipo : ''
+      equipo: existing ? existing.equipo : '',
+      disponible_campo: existing ? fieldAvailable_(existing.disponible_campo) : true,
+      motivo_indisponibilidad: existing ? existing.motivo_indisponibilidad : '',
+      disponibilidad_updated_at: existing ? existing.disponibilidad_updated_at : now
     });
   }
   upsertObject_(SHEETS.REQUESTS, 'solicitud_id', requestId, {

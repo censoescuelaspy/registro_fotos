@@ -1,7 +1,7 @@
 const SYSTEM_CONFIG = Object.freeze({
   APP_NAME: 'CIALPA Fotos',
-  APP_VERSION: '1.3.0',
-  SCHEMA_VERSION: '2026-07-25.1',
+  APP_VERSION: '1.4.0',
+  SCHEMA_VERSION: '2026-07-25.2',
   SPREADSHEET_ID: '1R_vG-q96SbzoYmMg9AL-PMY1YUeSyRTl5tJSfuGNqUo',
   ROOT_FOLDER_NAME: 'CIALPA_REGISTRO_FOTOS',
   SESSION_HOURS: 12,
@@ -12,7 +12,7 @@ const SYSTEM_CONFIG = Object.freeze({
     'http://127.0.0.1:4173',
     'http://localhost:4173'
   ],
-  CACHE_SCHEMA_KEY: 'schema-ready-2026-07-25.1'
+  CACHE_SCHEMA_KEY: 'schema-ready-2026-07-25.2'
 });
 
 const SHEETS = Object.freeze({
@@ -31,7 +31,8 @@ const HEADERS = Object.freeze({
   CONFIG: ['clave', 'valor', 'descripcion', 'updated_at'],
   USUARIOS: [
     'codigo_censista', 'nombres', 'apellidos', 'rol', 'pin_salt', 'pin_hash', 'activo',
-    'telefono', 'created_at', 'updated_at', 'ultimo_acceso', 'equipo'
+    'telefono', 'created_at', 'updated_at', 'ultimo_acceso', 'equipo',
+    'disponible_campo', 'motivo_indisponibilidad', 'disponibilidad_updated_at'
   ],
   SESIONES: [
     'token_hash', 'codigo_censista', 'rol', 'created_at', 'expires_at', 'revoked',
@@ -50,7 +51,7 @@ const HEADERS = Object.freeze({
     'numero_formulario', 'numero_hoja', 'bloque', 'piso', 'espacio', 'tipo_espacio',
     'estado', 'observaciones', 'danos_fallas', 'latitud_captura', 'longitud_captura',
     'precision_m', 'cantidad_fotos', 'cantidad_hojas_papel', 'created_at', 'updated_at',
-    'synced_at', 'device_id'
+    'synced_at', 'device_id', 'started_at', 'completed_at', 'duration_seconds'
   ],
   FOTOS: [
     'foto_id', 'idempotency_key', 'record_key', 'record_id', 'codigo_escuela',

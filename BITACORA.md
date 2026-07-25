@@ -1,5 +1,39 @@
 # Bitacora
 
+## 2026-07-25 - Tiempos, KPI y contingencias v1.4.0
+
+### Objetivo
+
+Probar la respuesta online y offline, medir el rendimiento sin perder trazabilidad y permitir que censistas y supervisores conozcan a tiempo el efecto de ausencias y demoras.
+
+### Implementado
+
+- Marcas `started_at`, `completed_at` y `duration_seconds` en cada registro nuevo.
+- KPI individual: fichas, finalizadas, porcentaje de finalizacion, fotos, promedio, mediana, horas acumuladas, demora de sincronizacion y ultima actividad.
+- KPI por equipo: integrantes disponibles, escuelas asignadas, atendidas y pendientes, registros, fotos, promedio, mediana y ultima actividad.
+- Disponibilidad de campo separada del estado de la cuenta, con motivo, fecha de actualizacion y auditoria.
+- Proyeccion de plazo basada en 45 minutos por escuela, 6 horas efectivas por dia y capacidad disponible.
+- Alerta de contingencia al bajar la capacidad y estado bloqueado cuando ningun integrante esta disponible.
+- Persistencia de borradores, cola offline, reintento al reconectar y control de timeout.
+- Matriz de pruebas y procedimiento operativo en `docs/PRUEBAS_CONTINGENCIA_CIALPA_FOTOS_2026-07-25.md`.
+
+### Compatibilidad y resguardo
+
+- Los registros anteriores se mantienen intactos; al no tener marcas temporales no alteran los promedios.
+- Respaldos ocultos previos a la migracion: `backup_usuarios_pre_kpis_20260725` y `backup_registros_pre_kpis_20260725`.
+- La estimacion es inicial y debe recalibrarse con la mediana y los traslados observados durante el piloto.
+
+### Validacion
+
+- Sintaxis JavaScript aprobada para frontend, service worker y los nueve archivos GAS.
+- Playwright: `38/38` recorridos aprobados en Chrome de escritorio y movil.
+- Casos incluidos: operacion online, cierre offline, reconexion y sincronizacion, borrador tras recarga, timeout, GPS, ausencia parcial, ausencia total y recorrido responsive.
+- Auditoria de dependencias de produccion: `0` vulnerabilidades.
+- Conciliacion operativa preservada: 8 equipos, 16 censistas, 85 construcciones y 86 codigos escolares.
+- Backend GAS desplegado como version `15`; endpoint saludable con app `1.4.0` y esquema `2026-07-25.2`.
+- Hoja privada verificada con los nuevos encabezados, validacion de casillas y los 17 usuarios activos —administrador y 16 censistas— inicialmente disponibles.
+- Publicacion y prueba de la URL pendientes de completar.
+
 ## 2026-07-25 - Equipos y asignaciones definitivas v1.3.0
 
 ### Objetivo

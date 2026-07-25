@@ -32,7 +32,11 @@ Probar la respuesta online y offline, medir el rendimiento sin perder trazabilid
 - Conciliacion operativa preservada: 8 equipos, 16 censistas, 85 construcciones y 86 codigos escolares.
 - Backend GAS desplegado como version `15`; endpoint saludable con app `1.4.0` y esquema `2026-07-25.2`.
 - Hoja privada verificada con los nuevos encabezados, validacion de casillas y los 17 usuarios activos —administrador y 16 censistas— inicialmente disponibles.
-- Publicacion y prueba de la URL pendientes de completar.
+- Commits funcionales: `43a4251` y correccion de arranque offline `65f6d28`.
+- GitHub Pages: flujos `30168223279` y `30168394524` completados correctamente.
+- URL publica verificada con HTTP `200`, frontend `1.4.0`, modulo de KPI y cache PWA `v1.4.0-r2`.
+- Smoke test publico movil aprobado: KPI individual y de equipo visibles, sin errores de pagina.
+- Arranque publico sin conexion aprobado en `83 ms`, con la PWA controlada por service worker y sin intentar esperar al backend.
 
 ## 2026-07-25 - Equipos y asignaciones definitivas v1.3.0
 

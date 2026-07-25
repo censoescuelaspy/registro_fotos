@@ -116,12 +116,15 @@ function setSession(session) {
 async function boot() {
   try {
     await database.open();
+    const healthRequest = navigator.onLine
+      ? api.health().catch((error) => ({ ok: false, error }))
+      : Promise.resolve({ ok: false, offline: true });
     const [catalogResponse, health] = await Promise.all([
       fetch(APP_CONFIG.schoolCatalogUrl, { cache: 'no-cache' }).then((response) => {
         if (!response.ok) throw new Error('No se pudo cargar el catalogo de escuelas.');
         return response.json();
       }),
-      api.health().catch((error) => ({ ok: false, error }))
+      healthRequest
     ]);
     state.catalogMeta = catalogResponse;
     state.catalog = catalogResponse.schools || [];
@@ -149,11 +152,16 @@ async function refreshLocalState() {
 }
 
 async function loadBootstrap(allowCache = false) {
+  const cached = loadJson('cialpa-fotos-bootstrap-cache-v1');
+  if (allowCache && !navigator.onLine && cached) {
+    state.bootstrap = cached;
+    toast('Sin conexion: se muestran las asignaciones guardadas en este celular.', 'info');
+    return;
+  }
   try {
     state.bootstrap = await api.bootstrap();
     saveJson('cialpa-fotos-bootstrap-cache-v1', state.bootstrap);
   } catch (error) {
-    const cached = loadJson('cialpa-fotos-bootstrap-cache-v1');
     if (allowCache && cached) {
       state.bootstrap = cached;
       toast('Sin conexion: se muestran las asignaciones guardadas en este celular.', 'info');
@@ -172,11 +180,17 @@ async function loadBootstrap(allowCache = false) {
 async function loadRemoteRecords(allowCache = false) {
   const user = state.bootstrap?.user || state.session?.user;
   if (!user) return;
+  const cached = loadJson(APP_CONFIG.recordsCacheKey);
+  if (allowCache && !navigator.onLine) {
+    state.remote = cached?.codigoCensista === user.codigoCensista
+      ? cached.data || { records: [], photos: [] }
+      : { records: [], photos: [] };
+    return;
+  }
   try {
     state.remote = await api.listRecords({ codigoCensista: user.codigoCensista });
     saveJson(APP_CONFIG.recordsCacheKey, { codigoCensista: user.codigoCensista, data: state.remote });
   } catch (error) {
-    const cached = loadJson(APP_CONFIG.recordsCacheKey);
     if (allowCache && cached?.codigoCensista === user.codigoCensista) {
       state.remote = cached.data || { records: [], photos: [] };
       return;

@@ -77,8 +77,20 @@ export class SchoolMap {
 
   focusSchool(school) {
     if (!this.map || !school) return;
-    this.map.setView([school.latitud, school.longitud], 18, { animate: false });
-    this.markers.get(school.codigo)?.openTooltip();
+    const marker = this.markers.get(school.codigo);
+    const point = marker?.getLatLng() || L.latLng(Number(school.latitud), Number(school.longitud));
+    if (!Number.isFinite(point.lat) || !Number.isFinite(point.lng)) return;
+
+    const focusSelectedSchool = () => {
+      if (!this.map) return;
+      this.map.invalidateSize({ animate: false, pan: false });
+      this.map.setView(point, 18, { animate: false });
+      marker?.openTooltip();
+    };
+
+    clearTimeout(this.invalidateTimer);
+    focusSelectedSchool();
+    this.invalidateTimer = setTimeout(focusSelectedSchool, 100);
   }
 
   showUserLocation(location) {

@@ -1,5 +1,29 @@
 # Bitacora
 
+## 2026-07-30 - Centrado estable de escuelas v1.4.1
+
+### Objetivo
+
+Corregir el desplazamiento del mapa observado al seleccionar una escuela desde la lista de la vista **Escuelas**, manteniendo sin cambios las coordenadas y el catalogo escolar.
+
+### Implementado
+
+- El enfoque usa la ubicacion exacta del marcador seleccionado como fuente de verdad.
+- Leaflet recalcula primero el tamaño visible del mapa y luego fija el centro y el nivel de acercamiento.
+- Se repite una vez el enfoque al finalizar el ajuste visual para evitar que un redimensionado tardio desplace el punto.
+- La invalidacion de tamaño se ejecuta con `pan: false`, por lo que no introduce un movimiento adicional.
+- Nueva prueba de regresion que selecciona el codigo `11007` desde la lista y comprueba que su marcador permanece en el centro del mapa.
+- Version de frontend y cache PWA incrementadas a `1.4.1` para que una futura publicacion invalide los archivos almacenados de la version anterior.
+
+### Validacion
+
+- La version publica consultada antes del cambio seguia sirviendo frontend `1.4.0` y cache PWA `v1.4.0-r2`.
+- Playwright se ejecuta desde una copia temporal local porque Google Drive genera archivos vacios al instalar dependencias dentro de `J:\Mi unidad`.
+- Prueba de regresion especifica: falla con la secuencia anterior y aprueba en Chrome de escritorio y movil con la correccion.
+- Suite completa Playwright: `40/40` recorridos aprobados.
+- Sintaxis JavaScript y archivos JSON aprobados; auditoria de dependencias de produccion: `0` vulnerabilidades.
+- Publicacion, commit y push pendientes de autorizacion expresa.
+
 ## 2026-07-25 - Tiempos, KPI y contingencias v1.4.0
 
 ### Objetivo

@@ -16,6 +16,44 @@ test('muestra las 86 escuelas piloto y permite filtrar', async ({ page }) => {
   await expect(page.getByText('COLEGIO NACIONAL DE E.M.D. PRESIDENTE FRANCO')).toBeVisible();
 });
 
+test('centra el mapa al seleccionar una escuela desde la lista', async ({ page }) => {
+  await page.evaluate(() => {
+    window.__mapOperations = [];
+    const originalSetView = window.L.Map.prototype.setView;
+    const originalInvalidateSize = window.L.Map.prototype.invalidateSize;
+    window.L.Map.prototype.setView = function setView(center, zoom, options) {
+      const point = window.L.latLng(center);
+      window.__mapOperations.push({ type: 'setView', lat: point.lat, lng: point.lng, zoom });
+      return originalSetView.call(this, center, zoom, options);
+    };
+    window.L.Map.prototype.invalidateSize = function invalidateSize(options) {
+      window.__mapOperations.push({ type: 'invalidateSize' });
+      return originalInvalidateSize.call(this, options);
+    };
+  });
+
+  await page.locator('[data-action="select-school"][data-school="11007"]').click();
+  await expect(page.locator('.school-marker.is-selected')).toBeVisible();
+  await page.waitForTimeout(250);
+
+  await expect.poll(async () => page.evaluate(() => {
+    const map = document.querySelector('#school-map')?.getBoundingClientRect();
+    const marker = document.querySelector('.school-marker.is-selected')?.getBoundingClientRect();
+    if (!map || !marker) return Number.POSITIVE_INFINITY;
+    const deltaX = (marker.left + marker.width / 2) - (map.left + map.width / 2);
+    const deltaY = (marker.top + marker.height / 2) - (map.top + map.height / 2);
+    return Math.hypot(deltaX, deltaY);
+  })).toBeLessThan(24);
+
+  const lastOperation = await page.evaluate(() => window.__mapOperations.at(-1));
+  expect(lastOperation).toEqual({
+    type: 'setView',
+    lat: -25.2844425,
+    lng: -57.6359119,
+    zoom: 18
+  });
+});
+
 test('crea un registro con identificador fotografico automatico', async ({ page }) => {
   await page.locator('[data-action="select-school"]').first().click();
   await page.locator('[data-action="start-record"]').click();

@@ -22,7 +22,10 @@ Corregir el desplazamiento del mapa observado al seleccionar una escuela desde l
 - Prueba de regresion especifica: falla con la secuencia anterior y aprueba en Chrome de escritorio y movil con la correccion.
 - Suite completa Playwright: `40/40` recorridos aprobados.
 - Sintaxis JavaScript y archivos JSON aprobados; auditoria de dependencias de produccion: `0` vulnerabilidades.
-- Publicacion, commit y push pendientes de autorizacion expresa.
+- Commit funcional `bd46d08` enviado a `main`.
+- GitHub Pages: flujo `30587389723` completado correctamente.
+- URL publica verificada con HTTP `200`, frontend `1.4.1`, build `2026-07-30` y cache PWA `cialpa-fotos-v1.4.1`.
+- Smoke test publico del codigo `11007`: marcador a `4,28 px` del centro, ultima operacion `setView` en `-25.2844425, -57.6359119`, detalle visible y cero errores de pagina.
 
 ## 2026-07-25 - Tiempos, KPI y contingencias v1.4.0
 

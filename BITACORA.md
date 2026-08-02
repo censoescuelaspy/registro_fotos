@@ -1,5 +1,29 @@
 # Bitacora
 
+## 2026-08-02 - Actualizacion automatica y version visible v1.7.3
+
+### Objetivo
+
+- Mostrar claramente la version instalada antes y despues del acceso.
+- Ofrecer un boton **Actualizar** visible para comprobar manualmente una publicacion nueva.
+- Buscar actualizaciones en cada inicio con conexion, instalarlas, recargar una sola vez y avisar al usuario al completar el cambio.
+
+### Implementacion
+
+- Nuevo `version.json` consultado con `cache: no-store` y parametro unico para impedir respuestas antiguas.
+- Registro del service worker con `updateViaCache: none` y comprobacion explicita mediante `registration.update()`.
+- Al activar una cache nueva, el service worker elimina solamente caches anteriores de CIALPA, toma control y navega cada cliente agregando temporalmente `app_updated`.
+- La app retira ese parametro de la URL y muestra durante 30 segundos el aviso **Aplicacion actualizada correctamente**.
+- Antes de una comprobacion manual, cualquier ficha abierta se guarda como borrador local para que una recarga de version no pierda el trabajo capturado.
+- Version y boton visibles en la pantalla de acceso, barra superior y cuenta; diseño ajustado para escritorio y celular.
+- Version de frontend, backend y cache PWA incrementada a `1.7.3`; esquema de datos sin cambios.
+
+### Validacion local
+
+- Sintaxis JavaScript y JSON validos; `git diff --check` sin errores.
+- Pruebas de actualizacion en escritorio y Pixel 7 simulado: version visible, boton manual, invalidacion de cache anterior, navegacion automatica, limpieza de URL y aviso posterior aprobados.
+- Regresion funcional: `66/66` pruebas generales aprobadas; ensayo intensivo separado `2/2`, con 300/300 fotos nuevamente abiertas en ambos perfiles (`68/68` en total).
+
 ## 2026-08-02 - Escuela ficticia y ensayo de 300 fotografias v1.7.2
 
 ### Alcance

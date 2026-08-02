@@ -1,4 +1,5 @@
-const CACHE_VERSION = 'cialpa-fotos-v1.7.2';
+const CACHE_VERSION = 'cialpa-fotos-v1.7.3';
+const APP_VERSION = '1.7.3';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_ASSETS = [
   './',
@@ -39,8 +40,19 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => !key.startsWith(CACHE_VERSION)).map((key) => caches.delete(key))))
-      .then(() => self.clients.claim())
+      .then(async (keys) => {
+        const staleCaches = keys.filter((key) => key.startsWith('cialpa-fotos-') && !key.startsWith(CACHE_VERSION));
+        await Promise.all(staleCaches.map((key) => caches.delete(key)));
+        await self.clients.claim();
+        if (!staleCaches.length) return;
+        const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        clients.forEach((client) => {
+          const url = new URL(client.url);
+          if (url.searchParams.get('app_updated') === APP_VERSION) return;
+          url.searchParams.set('app_updated', APP_VERSION);
+          client.navigate(url.href);
+        });
+      })
   );
 });
 
@@ -49,6 +61,10 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.endsWith('/version.json')) {
+    event.respondWith(fetch(request, { cache: 'no-store' }));
+    return;
+  }
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)

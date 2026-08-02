@@ -160,6 +160,12 @@ p { color: var(--muted); }
 .access-panel { display: grid; place-items: center; padding: 28px; background: var(--canvas); }
 .access-card { width: min(100%, 520px); padding: clamp(24px, 4vw, 42px); border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: var(--shadow); }
 .version-line { margin: 22px 0 0; text-align: center; font-size: 0.75rem; }
+.version-control { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 20px; }
+.version-badge { display: inline-flex; align-items: center; min-height: 34px; padding: 6px 10px; border: 1px solid #9cb7cd; border-radius: 99px; color: var(--navy-950); background: var(--navy-100); font-size: 0.75rem; font-weight: 850; white-space: nowrap; }
+.update-app-button { min-height: 34px; padding: 6px 10px; white-space: nowrap; }
+.version-control.is-compact { margin: 0; gap: 6px; }
+.version-control.is-compact .version-badge { min-height: 30px; padding: 4px 8px; font-size: 0.68rem; }
+.version-control.is-compact .update-app-button { min-height: 32px; padding: 5px 8px; font-size: 0.72rem; }
 .status-dot { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); font-size: 0.75rem; font-weight: 800; }
 .status-dot::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--red-700); }
 .status-dot.online::before { background: var(--green-700); }
@@ -693,6 +699,12 @@ td > .context-help-button { margin-left: 8px; }
   .view-heading { gap: 10px; }
   .view-heading > .btn { min-width: 42px; padding: 9px; font-size: 0; }
   .view-heading > .btn svg { margin: 0; }
+  .brand-button span { display: none; }
+  .brand-button img { width: 42px; }
+  .topbar-actions { gap: 3px; }
+  .version-control.is-compact .version-badge { padding-inline: 7px; }
+  .version-control.is-compact .update-app-button span { display: none; }
+  .version-control.is-compact .update-app-button { width: 34px; padding: 5px; }
   .capture-grid { grid-template-columns: 1fr 1fr; }
   .element-fields { grid-template-columns: 1fr 110px; }
   .capture-button { min-height: 108px; padding: 9px; }

@@ -81,6 +81,8 @@ const state = {
   },
   syncing: false,
   installPrompt: null,
+  updateChecking: false,
+  serviceWorkerRegistration: null,
   online: navigator.onLine
 };
 
@@ -123,6 +125,66 @@ function toast(message, tone = 'info', timeout = 4500) {
   setTimeout(() => element.remove(), timeout);
 }
 
+function versionControl(compact = false) {
+  return `<div class="version-control ${compact ? 'is-compact' : ''}" aria-label="Version de la aplicacion">
+    <span class="version-badge">${compact ? 'v' : 'Version '}${APP_CONFIG.version}</span>
+    <button type="button" class="btn btn-secondary update-app-button" data-action="check-app-update" aria-label="Actualizar aplicacion" ${state.updateChecking ? 'disabled' : ''}>${icon('refresh-cw')} <span>${state.updateChecking ? 'Buscando...' : 'Actualizar'}</span></button>
+  </div>`;
+}
+
+function setUpdateChecking(checking) {
+  state.updateChecking = checking;
+  document.querySelectorAll('[data-action="check-app-update"]').forEach((button) => {
+    button.disabled = checking;
+    button.innerHTML = `${icon('refresh-cw')} <span>${checking ? 'Buscando...' : 'Actualizar'}</span>`;
+  });
+  refreshIcons();
+}
+
+async function fetchPublishedVersion() {
+  const separator = APP_CONFIG.versionManifestUrl.includes('?') ? '&' : '?';
+  const response = await fetch(`${APP_CONFIG.versionManifestUrl}${separator}t=${Date.now()}`, { cache: 'no-store' });
+  if (!response.ok) throw new Error('No se pudo consultar la version publicada.');
+  return response.json();
+}
+
+async function checkAppUpdate({ manual = false } = {}) {
+  if (state.updateChecking) return;
+  if (!navigator.onLine) {
+    if (manual) toast('No hay conexion para buscar actualizaciones.', 'warning');
+    return;
+  }
+  setUpdateChecking(true);
+  try {
+    const published = await fetchPublishedVersion();
+    if (state.serviceWorkerRegistration) await state.serviceWorkerRegistration.update();
+    if (String(published.version || '') === APP_CONFIG.version) {
+      if (manual) toast(`Ya esta usando la version ${APP_CONFIG.version}.`, 'success');
+      return;
+    }
+    toast(`Se encontro la version ${published.version}. La actualizacion se instalara automaticamente.`, 'info', 7000);
+  } catch (error) {
+    if (manual) toast(error.message || 'No se pudo buscar una actualizacion.', 'error');
+  } finally {
+    setUpdateChecking(false);
+  }
+}
+
+function showAppliedUpdateNotice() {
+  const url = new URL(location.href);
+  const updatedVersion = url.searchParams.get('app_updated');
+  if (!updatedVersion) return;
+  url.searchParams.delete('app_updated');
+  history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
+  toast(`Aplicacion actualizada correctamente a la version ${updatedVersion}.`, 'success', 30000);
+}
+
+async function initializeAppUpdates() {
+  if (!('serviceWorker' in navigator) || APP_CONFIG.demo) return;
+  state.serviceWorkerRegistration = await navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' });
+  await checkAppUpdate();
+}
+
 function setSession(session) {
   state.session = session;
   api.setSession(session);
@@ -153,6 +215,7 @@ async function boot() {
       setSession(null);
     }
     render();
+    showAppliedUpdateNotice();
     if (state.session && navigator.onLine) syncQueue({ quiet: true });
   } catch (error) {
     app.innerHTML = renderFatal(error);
@@ -307,7 +370,8 @@ function renderAccess() {
             <button class="btn btn-secondary full-row" type="submit">${icon('shield-plus')} Crear administrador</button>
           </form>
         </details>` : ''}
-        <p class="version-line">Version ${APP_CONFIG.version} · ${APP_CONFIG.buildDate}</p>
+        ${versionControl()}
+        <p class="version-line">Publicada el ${APP_CONFIG.buildDate}</p>
       </div>
     </section>
   </main>`;
@@ -343,6 +407,7 @@ function renderShell() {
         <span><strong>CIALPA Fotos</strong><small>Registro de campo</small></span>
       </button>
       <div class="topbar-actions">
+        ${versionControl(true)}
         <span class="network-chip ${state.online ? 'is-online' : 'is-offline'}">${icon(state.online ? 'wifi' : 'wifi-off', 15)} ${state.online ? 'En linea' : 'Sin conexion'}</span>
         <button class="icon-btn sync-button ${state.queue.length ? 'has-badge' : ''}" data-action="sync" title="Sincronizar pendientes" aria-label="Sincronizar pendientes">
           ${icon('refresh-cw')}<span class="button-badge">${state.queue.length}</span>
@@ -360,7 +425,7 @@ function renderShell() {
       <nav aria-label="Navegacion principal">
         ${navItems.map(([view, iconName, label]) => navButton(view, iconName, label)).join('')}
       </nav>
-      <div class="side-footer">v${APP_CONFIG.version}</div>
+      <div class="side-footer">Version ${APP_CONFIG.version}</div>
     </aside>
     <main class="main-content" id="main-content">
       ${APP_CONFIG.loadTest ? `<div class="load-test-banner">${icon('flask-conical')} <strong>Simulacion de carga:</strong> escuela ficticia 9999001, 75 registros y 300 fotos. No utiliza el libro productivo.</div>` : ''}
@@ -976,6 +1041,7 @@ function renderAccount() {
       <div><span>${icon('database')}<b>Catalogo</b></span><span>${state.catalog.length} escuelas · ${escapeHtml(state.catalogMeta?.scope || '')}</span></div>
       <div><span>${icon('cloud')}<b>Sincronizacion</b></span><span>${state.queue.length ? `${state.queue.length} pendientes` : 'Al dia'}</span></div>
       <div><span>${icon('app-window')}<b>Version</b></span><span>${APP_CONFIG.version} · ${APP_CONFIG.buildDate}</span></div>
+      <button type="button" data-action="check-app-update"><span>${icon('refresh-cw')}<b>Actualizar aplicacion</b></span><span>Buscar ahora</span></button>
       <button type="button" data-view="guide"><span>${icon('list-checks')}<b>Guia operativa</b></span><span>Abrir en la app</span></button>
       <a href="${APP_CONFIG.trainingManualUrl}" target="_blank" rel="noopener"><span>${icon('presentation')}<b>Manual de capacitacion</b></span><span>35 diapositivas</span></a>
       <a href="${APP_CONFIG.manualUrl}" target="_blank" rel="noopener"><span>${icon('book-open-check')}<b>Manual rapido</b></span><span>Abrir hoja 2</span></a>
@@ -1545,6 +1611,14 @@ async function handleClick(event) {
   if (!button) return;
   const action = button.dataset.action;
   if (action === 'reload') location.reload();
+  if (action === 'check-app-update') {
+    if (state.activeDraft) {
+      updateDraftFromForm();
+      await database.saveDraft(state.activeDraft);
+      await refreshLocalState();
+    }
+    await checkAppUpdate({ manual: true });
+  }
   if (action === 'toggle-pin') {
     const input = button.parentElement.querySelector('input');
     input.type = input.type === 'password' ? 'text' : 'password';
@@ -2253,8 +2327,6 @@ window.addEventListener('beforeinstallprompt', (event) => {
   if (state.session) render();
 });
 
-if ('serviceWorker' in navigator && !APP_CONFIG.demo) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
-}
+window.addEventListener('load', () => initializeAppUpdates().catch(() => {}));
 
 boot();

@@ -15,6 +15,7 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 
 ## Operacion y supervision
 
+- La version instalada se muestra de forma visible en el acceso, la barra superior, el menu lateral y **Mi cuenta**. Al iniciar con conexion, la PWA consulta `version.json` sin cache, solicita la actualizacion del service worker y, si existe una version nueva, reemplaza la cache, recarga una vez y avisa al usuario. El boton **Actualizar** permite repetir la comprobacion manualmente.
 - Los campos, encabezados, indicadores y acciones principales incorporan ayuda emergente **(i)** basada en el manual operativo, accesible con teclado y adaptada a celular.
 - **Mi jornada** muestra avance personal, siguiente escuela, borradores, cola local, registros sincronizados, tiempos por ficha y KPI propios y del equipo.
 - **Fotos** presenta una galeria responsive por escuela y registro. El administrador ve el conjunto general; supervisores y encuestadores ven las escuelas autorizadas para su equipo.
@@ -63,6 +64,7 @@ La galeria no cambia esos permisos: solicita cada imagen al backend con la sesio
 ## Componentes
 
 - `index.html`, `assets/`, `sw.js`: PWA estatica para GitHub Pages.
+- `version.json`: manifiesto liviano consultado sin cache para comprobar la version publicada.
 - `assets/data/pilot-schools.json`: catalogo vigente de 86 escuelas piloto de Capital y Central.
 - `tools/build_team_roster.py`: reconstruccion verificable de 16 censistas, 8 equipos, 85 ubicaciones fisicas y 86 codigos escolares desde los documentos operativos.
 - `gas/`: backend de Google Apps Script vinculado a la hoja de control.

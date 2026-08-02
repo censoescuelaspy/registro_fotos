@@ -169,6 +169,17 @@ test('permite ver y ampliar las fotos sincronizadas desde la galeria', async ({ 
   });
   await page.getByRole('button', { name: /Finalizar y sincronizar/ }).click();
   await expect(page.getByRole('heading', { name: 'Mi jornada' })).toBeVisible();
+  await expect.poll(() => page.evaluate(() => JSON.parse(localStorage.getItem('cialpa-fotos-demo-data-v1')).photos.length)).toBe(1);
+  await page.evaluate(() => {
+    const key = 'cialpa-fotos-demo-data-v1';
+    const data = JSON.parse(localStorage.getItem(key));
+    const photo = data.photos[0];
+    const binary = atob(photo.demoBase64);
+    const repeated = binary.repeat(Math.max(2, Math.ceil(310000 / binary.length)));
+    photo.demoBase64 = btoa(repeated);
+    photo.bytes = repeated.length;
+    localStorage.setItem(key, JSON.stringify(data));
+  });
   await page.locator('[data-view="photos"]:visible').first().click();
   await expect(page.getByRole('heading', { name: 'Fotografias por escuela' })).toBeVisible();
   await expect(page.locator('.gallery-card')).toHaveCount(1);

@@ -1,5 +1,25 @@
 # Bitacora
 
+## 2026-08-02 - Correccion del transporte fotografico v1.7.1
+
+### Diagnostico
+
+La galeria 1.7.0 recibia correctamente escuelas, registros y metadatos, pero las tres imagenes del registro seleccionado fallaban al cruzar completas como base64 por la respuesta HTML del puente de Apps Script. La evidencia visual mostro el mismo fallo desde 878 KiB hasta 1,6 MiB, consistente con un limite de respuesta y no con registros faltantes.
+
+### Correccion
+
+- El backend divide cada imagen privada en fragmentos base64 de 300.000 caracteres y numera la secuencia completa.
+- El navegador descarga como maximo dos fotografias en paralelo, valida todos los fragmentos y reconstruye la imagen solo en memoria.
+- Si un archivo falla, la tarjeta muestra ahora el mensaje real del servidor y permite reintentar individualmente.
+- Se mantienen la autenticacion, el alcance por equipo y la privacidad de Drive; no se modificaron fotos, registros ni permisos.
+- Version de frontend, backend y cache PWA incrementada a `1.7.1`; esquema sin cambios.
+
+### Validacion y despliegue
+
+- Prueba especifica con imagen base64 de mas de 300.000 caracteres: reconstruccion correcta en escritorio y Pixel 7.
+- Suite Playwright completa: `58/58` pruebas aprobadas; sintaxis y `git diff --check` sin errores.
+- Backend publicado como version inmutable `20` y deployment productivo actualizado a `@20`, conservando la URL `/exec`.
+
 ## 2026-08-02 - Galeria autenticada por escuela y registro v1.7.0
 
 ### Objetivo

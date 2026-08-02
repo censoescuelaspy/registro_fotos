@@ -23,6 +23,7 @@ test('el backend resuelve el codigo RUE y conserva una unica llave interna', () 
     requireRole_: () => {},
     digits_: (value) => String(value || '').replace(/\D/g, ''),
     text_: (value) => String(value || ''),
+    number_: (value) => Number(value),
     nowIso_: () => '2026-08-01T22:00:00-03:00',
     upsertObject_: (sheet, key, id, values) => updatedAssignments.push({ sheet, key, id, values }),
     appendObject_: (sheet, values) => appendedAssignments.push({ sheet, values }),
@@ -149,6 +150,7 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
     boolean_: (value) => value === true,
     digits_: (value) => String(value || '').replace(/\D/g, ''),
     text_: (value) => String(value || ''),
+    number_: (value) => Number(value),
     apiError_: (code, message) => Object.assign(new Error(message), { apiCode: code }),
     SYSTEM_CONFIG: { MAX_PHOTO_BYTES: 15 * 1024 * 1024 },
     Utilities: { base64Encode: (bytes) => Buffer.from(bytes).toString('base64') },
@@ -174,6 +176,13 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
   expect(listed.records[0].codigoCensista).toBe('2345678');
   expect(listed.photos).toHaveLength(1);
   expect(listed.photos[0].codigoCensista).toBe('2345678');
-  expect(context.getPhotoContent_({ fotoId: 'F1' }, session)).toMatchObject({ fotoId: 'F1', mimeType: 'image/jpeg', base64: 'AQID' });
+  expect(context.getPhotoContent_({ fotoId: 'F1' }, session)).toMatchObject({ fotoId: 'F1', mimeType: 'image/jpeg', chunkIndex: 0, totalChunks: 1, chunk: 'AQID' });
+  const largeBytes = Array(225001).fill(7);
+  context.DriveApp.getFileById = () => ({ getBlob: () => ({ getBytes: () => largeBytes }) });
+  const firstChunk = context.getPhotoContent_({ fotoId: 'F1', chunkIndex: 0 }, session);
+  const secondChunk = context.getPhotoContent_({ fotoId: 'F1', chunkIndex: 1 }, session);
+  expect(firstChunk.totalChunks).toBe(2);
+  expect(firstChunk.chunk).toHaveLength(300000);
+  expect(firstChunk.chunk + secondChunk.chunk).toBe(Buffer.from(largeBytes).toString('base64'));
   expect(() => context.getPhotoContent_({ fotoId: 'F2' }, session)).toThrow(/no esta asignada/i);
 });

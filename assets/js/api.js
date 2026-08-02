@@ -263,7 +263,18 @@ async function demoRequest(action, payload = {}) {
       const visiblePhotos = scope.current.rol === 'ADMIN' ? data.photos : scope.photos;
       const photo = visiblePhotos.find((item) => item.fotoId === payload.fotoId);
       if (!photo) throw new ApiError('La fotografia no existe o no esta autorizada.', 'PHOTO_NOT_FOUND');
-      return { fotoId: photo.fotoId, mimeType: photo.mimeType || 'image/jpeg', bytes: Number(photo.bytes || 0), base64: photo.demoBase64 || '' };
+      const base64 = photo.demoBase64 || '';
+      const chunkSize = 300000;
+      const totalChunks = Math.max(1, Math.ceil(base64.length / chunkSize));
+      const chunkIndex = Math.max(0, Math.min(totalChunks - 1, Number(payload.chunkIndex || 0)));
+      return {
+        fotoId: photo.fotoId,
+        mimeType: photo.mimeType || 'image/jpeg',
+        bytes: Number(photo.bytes || 0),
+        chunkIndex,
+        totalChunks,
+        chunk: base64.slice(chunkIndex * chunkSize, (chunkIndex + 1) * chunkSize)
+      };
     }
     case 'adminDashboard':
       {
@@ -480,7 +491,7 @@ export class ApiClient {
   saveRecord(record) { return this.request('saveRecord', { record }); }
   uploadPhoto(photo, base64) { return this.request('uploadPhoto', { photo, base64 }, { timeout: 90000 }); }
   listRecords(filters = {}) { return this.request('listRecords', filters); }
-  getPhotoContent(fotoId) { return this.request('getPhotoContent', { fotoId }, { timeout: 90000 }); }
+  getPhotoContent(fotoId, chunkIndex = 0) { return this.request('getPhotoContent', { fotoId, chunkIndex }, { timeout: 90000 }); }
   adminDashboard() { return this.request('adminDashboard'); }
   saveUser(user) { return this.request('saveUser', { user }); }
   setAvailability(codigoCensista, disponibleCampo, motivoIndisponibilidad = '') {

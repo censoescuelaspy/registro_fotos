@@ -468,5 +468,18 @@ function getPhotoContent_(payload, session) {
   if (!bytes.length || bytes.length > SYSTEM_CONFIG.MAX_PHOTO_BYTES) {
     throw apiError_('PHOTO_TOO_LARGE', 'La fotografia supera el limite permitido.');
   }
-  return { fotoId: fotoId, mimeType: mimeType, bytes: bytes.length, base64: Utilities.base64Encode(bytes) };
+  const base64 = Utilities.base64Encode(bytes);
+  const chunkSize = 300000;
+  const totalChunks = Math.ceil(base64.length / chunkSize);
+  const chunkIndex = payload && payload.chunkIndex != null
+    ? number_(payload.chunkIndex, 'fragmento de fotografia', 0, Math.max(0, totalChunks - 1), false)
+    : 0;
+  return {
+    fotoId: fotoId,
+    mimeType: mimeType,
+    bytes: bytes.length,
+    chunkIndex: chunkIndex,
+    totalChunks: totalChunks,
+    chunk: base64.slice(chunkIndex * chunkSize, (chunkIndex + 1) * chunkSize)
+  };
 }

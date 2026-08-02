@@ -1383,20 +1383,29 @@ async function toggleUser(code, active) {
 async function hydrateGalleryPhotos() {
   const photos = (state.remote?.photos || []).filter((photo) => recordKeyOf(photo) === state.gallery.recordKey);
   const pending = photos.filter((photo) => !state.gallery.content[photo.fotoId]?.dataUrl && !state.gallery.content[photo.fotoId]?.loading);
-  for (let index = 0; index < pending.length; index += 4) {
-    await Promise.all(pending.slice(index, index + 4).map((photo) => loadGalleryPhotoContent(photo)));
+  for (let index = 0; index < pending.length; index += 2) {
+    await Promise.all(pending.slice(index, index + 2).map((photo) => loadGalleryPhotoContent(photo)));
   }
 }
 
 async function loadGalleryPhotoContent(photo) {
   state.gallery.content[photo.fotoId] = { loading: true };
   try {
-    const result = await api.getPhotoContent(photo.fotoId);
-    const mimeType = String(result.mimeType || '').toLowerCase();
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) || !result.base64) {
+    const first = await api.getPhotoContent(photo.fotoId, 0);
+    const mimeType = String(first.mimeType || '').toLowerCase();
+    const totalChunks = Number(first.totalChunks || 0);
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) || !first.chunk || totalChunks < 1 || totalChunks > 100) {
       throw new Error('El servidor devolvio una imagen no valida.');
     }
-    const dataUrl = `data:${mimeType};base64,${result.base64}`;
+    const chunks = [first.chunk];
+    for (let chunkIndex = 1; chunkIndex < totalChunks; chunkIndex += 1) {
+      const next = await api.getPhotoContent(photo.fotoId, chunkIndex);
+      if (Number(next.chunkIndex) !== chunkIndex || Number(next.totalChunks) !== totalChunks || !next.chunk) {
+        throw new Error('La descarga de la fotografia quedo incompleta.');
+      }
+      chunks.push(next.chunk);
+    }
+    const dataUrl = `data:${mimeType};base64,${chunks.join('')}`;
     state.gallery.content[photo.fotoId] = { dataUrl, loading: false };
     const button = document.querySelector(`[data-gallery-photo="${CSS.escape(photo.fotoId)}"] .gallery-image`);
     if (button) button.innerHTML = `<img src="${dataUrl}" alt="${escapeHtml(photo.codigoFoto || 'Fotografia del registro')}" loading="lazy">`;
@@ -1404,6 +1413,10 @@ async function loadGalleryPhotoContent(photo) {
     state.gallery.content[photo.fotoId] = { loading: false, error: error.message || 'No se pudo cargar.' };
     const placeholder = document.querySelector(`[data-gallery-photo="${CSS.escape(photo.fotoId)}"] .gallery-placeholder`);
     if (placeholder) placeholder.innerHTML = `${icon('image-off', 30)}<span>No se pudo cargar</span>`;
+    const copy = document.querySelector(`[data-gallery-photo="${CSS.escape(photo.fotoId)}"] .gallery-card-copy`);
+    if (copy && !copy.querySelector('.gallery-error')) {
+      copy.insertAdjacentHTML('beforeend', `<p class="gallery-error">${escapeHtml(error.message || 'No se pudo cargar la fotografia.')}</p><button class="btn btn-quiet" data-action="retry-gallery-photo" data-photo="${escapeHtml(photo.fotoId)}">${icon('rotate-cw')} Reintentar</button>`);
+    }
     refreshIcons();
   }
 }

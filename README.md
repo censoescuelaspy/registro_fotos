@@ -87,6 +87,8 @@ En carpetas sincronizadas de Google Drive conviene ejecutar `npm ci` en una copi
 
 La demostracion local se habilita en `http://127.0.0.1:4173/?demo=1` con codigo `1234567` y PIN `1234`. El modo demo solo usa datos del navegador.
 
+La prueba intensiva de una escuela se habilita con `?demo=1&loadtest=1`. Agrega exclusivamente en el navegador la escuela ficticia `9999001`, 75 registros y 300 fotografias simuladas a partir de cuatro PNG del repositorio. No escribe en Google Sheets ni Google Drive. El recorrido automatizado se ejecuta con `npm run test:load`.
+
 ## Backend y primer administrador
 
 La instalacion operativa ya tiene una cuenta administrativa provisionada en la hoja privada. Su contrasena se administra fuera del repositorio y nunca debe incorporarse al frontend, la documentacion o los commits.

@@ -1,6 +1,6 @@
 {
   "name": "cialpa-registro-fotos",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "private": true,
   "description": "PWA para registrar y vincular fotografias del relevamiento escolar CIALPA.",
   "scripts": {
@@ -8,6 +8,7 @@
     "catalog": "python tools/build_school_catalog.py",
     "serve": "npx http-server . -p 4173 -c-1",
     "test": "playwright test",
+    "test:load": "playwright test tests/load-test-school.spec.js",
     "test:ui": "playwright test --ui"
   },
   "dependencies": {

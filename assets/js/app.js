@@ -1,4 +1,5 @@
 import { APP_CONFIG } from './config.js';
+import { DEMO_LOAD_SCHOOL } from './demo-load.js';
 import { ApiClient, ApiError, getDeviceId } from './api.js';
 import { LocalDatabase } from './db.js';
 import { blobToBase64, captureLocation, prepareImage } from './image.js';
@@ -142,7 +143,7 @@ async function boot() {
       healthRequest
     ]);
     state.catalogMeta = catalogResponse;
-    state.catalog = catalogResponse.schools || [];
+    state.catalog = [...(catalogResponse.schools || []), ...(APP_CONFIG.loadTest ? [DEMO_LOAD_SCHOOL] : [])];
     state.health = health;
     await refreshLocalState();
     if (state.session && new Date(state.session.expiresAt || 0) > new Date()) {
@@ -361,7 +362,10 @@ function renderShell() {
       </nav>
       <div class="side-footer">v${APP_CONFIG.version}</div>
     </aside>
-    <main class="main-content" id="main-content">${renderCurrentView()}</main>
+    <main class="main-content" id="main-content">
+      ${APP_CONFIG.loadTest ? `<div class="load-test-banner">${icon('flask-conical')} <strong>Simulacion de carga:</strong> escuela ficticia 9999001, 75 registros y 300 fotos. No utiliza el libro productivo.</div>` : ''}
+      ${renderCurrentView()}
+    </main>
     <nav class="bottom-nav" aria-label="Navegacion movil">
       ${mobileNavItems.map(([view, iconName, label]) => navButton(
         view, iconName, label, true, view === 'admin' && operationsViews.has(state.view)

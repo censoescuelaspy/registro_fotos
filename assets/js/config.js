@@ -1,6 +1,6 @@
 export const APP_CONFIG = Object.freeze({
   appName: 'CIALPA Fotos',
-  version: '1.7.1',
+  version: '1.7.2',
   buildDate: '2026-08-02',
   gasExecUrl: 'https://script.google.com/macros/s/AKfycbz8RmR-TqSb3FzaLSgMO2NlTTOfRPWuYjSC5ZyXw1Vr5iL-PBYeDIerNvCVj--hNjYk/exec',
   schoolCatalogUrl: './assets/data/pilot-schools.json',
@@ -13,6 +13,8 @@ export const APP_CONFIG = Object.freeze({
   maxSourceBytes: 50 * 1024 * 1024,
   maxUploadBytes: 15 * 1024 * 1024,
   sessionHours: 12,
+  loadTest: new URLSearchParams(location.search).get('loadtest') === '1',
   demo: new URLSearchParams(location.search).get('demo') === '1'
+    || new URLSearchParams(location.search).get('loadtest') === '1'
     || ['localhost', '127.0.0.1'].includes(location.hostname)
 });

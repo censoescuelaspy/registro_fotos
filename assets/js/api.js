@@ -1,4 +1,5 @@
 import { APP_CONFIG } from './config.js';
+import { DEMO_LOAD_SCHOOL, DEMO_LOAD_USER, createDemoLoadDataset } from './demo-load.js';
 
 function isGasMessageOrigin(origin) {
   try {
@@ -23,14 +24,31 @@ export class ApiError extends Error {
   }
 }
 
-const demoStoreKey = 'cialpa-fotos-demo-data-v1';
+const demoStoreKey = APP_CONFIG.loadTest ? 'cialpa-fotos-demo-load-data-v1' : 'cialpa-fotos-demo-data-v1';
+const demoAssetCache = new Map();
+
+async function demoAssetBase64(url) {
+  if (!demoAssetCache.has(url)) {
+    demoAssetCache.set(url, fetch(url).then(async (response) => {
+      if (!response.ok) throw new ApiError('No se pudo leer la imagen simulada.', 'DEMO_ASSET_MISSING');
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      let binary = '';
+      for (let index = 0; index < bytes.length; index += 8192) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 8192));
+      }
+      return btoa(binary);
+    }));
+  }
+  return demoAssetCache.get(url);
+}
 
 function demoData() {
   const saved = localStorage.getItem(demoStoreKey);
   if (saved) return JSON.parse(saved);
+  const loadDataset = APP_CONFIG.loadTest ? createDemoLoadDataset() : { records: [], photos: [] };
   const initial = {
-    records: [],
-    photos: [],
+    records: loadDataset.records,
+    photos: loadDataset.photos,
     users: [
       {
         codigoCensista: '1234567',
@@ -69,11 +87,13 @@ function demoData() {
         rol: 'SUPERVISOR',
         disponibleCampo: true,
         activo: true
-      }
+      },
+      ...(APP_CONFIG.loadTest ? [DEMO_LOAD_USER] : [])
     ],
     assignments: [
       { assignmentId: crypto.randomUUID(), codigoCensista: '2345678', codigoEscuela: '11007', activo: true, updatedAt: new Date().toISOString() },
-      { assignmentId: crypto.randomUUID(), codigoCensista: '3456789', codigoEscuela: '10038', activo: true, updatedAt: new Date().toISOString() }
+      { assignmentId: crypto.randomUUID(), codigoCensista: '3456789', codigoEscuela: '10038', activo: true, updatedAt: new Date().toISOString() },
+      ...(APP_CONFIG.loadTest ? [{ assignmentId: crypto.randomUUID(), codigoCensista: DEMO_LOAD_USER.codigoCensista, codigoEscuela: DEMO_LOAD_SCHOOL.codigo, activo: true, updatedAt: new Date().toISOString() }] : [])
     ],
     requests: []
   };
@@ -101,7 +121,7 @@ function demoScope(data, payload = {}) {
 }
 
 function demoPhotoView(photo) {
-  const { demoBase64, ...metadata } = photo;
+  const { demoBase64, demoAssetUrl, ...metadata } = photo;
   return metadata;
 }
 
@@ -263,7 +283,7 @@ async function demoRequest(action, payload = {}) {
       const visiblePhotos = scope.current.rol === 'ADMIN' ? data.photos : scope.photos;
       const photo = visiblePhotos.find((item) => item.fotoId === payload.fotoId);
       if (!photo) throw new ApiError('La fotografia no existe o no esta autorizada.', 'PHOTO_NOT_FOUND');
-      const base64 = photo.demoBase64 || '';
+      const base64 = photo.demoBase64 || await demoAssetBase64(photo.demoAssetUrl);
       const chunkSize = 300000;
       const totalChunks = Math.max(1, Math.ceil(base64.length / chunkSize));
       const chunkIndex = Math.max(0, Math.min(totalChunks - 1, Number(payload.chunkIndex || 0)));

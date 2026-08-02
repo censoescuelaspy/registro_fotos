@@ -252,6 +252,7 @@ input:hover, select:hover, textarea:hover { border-color: var(--navy-800); }
 .bottom-nav { display: none; }
 
 .main-content { min-height: 100vh; padding: calc(var(--topbar-height) + 24px) 24px 32px calc(var(--side-width) + 24px); }
+.load-test-banner { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding: 10px 12px; border: 1px solid #d99b1d; border-left: 5px solid #d99b1d; border-radius: 7px; color: #5f4308; background: #fff7df; font-size: .79rem; }
 .view { width: min(100%, 1500px); margin: 0 auto; }
 .view-heading { min-height: 64px; display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
 .view-heading p { margin-bottom: 0; font-size: 0.88rem; }

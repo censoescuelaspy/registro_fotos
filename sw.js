@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'cialpa-fotos-v1.7.1';
+const CACHE_VERSION = 'cialpa-fotos-v1.7.2';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_ASSETS = [
   './',
@@ -8,6 +8,7 @@ const STATIC_ASSETS = [
   './assets/js/app.js',
   './assets/js/api.js',
   './assets/js/config.js',
+  './assets/js/demo-load.js',
   './assets/js/db.js',
   './assets/js/image.js',
   './assets/js/help.js',

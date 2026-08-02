@@ -1,5 +1,28 @@
 # Bitacora
 
+## 2026-08-02 - Escuela ficticia y ensayo de 300 fotografias v1.7.2
+
+### Alcance
+
+- Escenario aislado `?demo=1&loadtest=1`; no escribe en el libro ni en Drive productivos.
+- Escuela ficticia `9999001`, usuario sintetico `9980001`, 75 registros y 300 fotografias generadas con cuatro PNG existentes del repositorio.
+- Aviso visible permanente que identifica la simulacion y confirma que no usa el libro productivo.
+- Dataset reproducible en `assets/js/demo-load.js` y prueba integral en `tests/load-test-school.spec.js`.
+
+### Resultados iniciales
+
+- Escritorio: metadatos en 997 ms; recorrido de 300 fotos en 33.550 ms; total 34.847 ms; 300/300 sin error.
+- Pixel 7 simulado: metadatos en 998 ms; recorrido de 300 fotos en 32.940 ms; total 34.132 ms; 300/300 sin error.
+- Volumen de imagen simulado: 16.333.800 bytes; `localStorage` aproximado 1.120.758 bytes.
+- Informe metodologico y limites en `docs/PRUEBA_CARGA_ESCUELA_SIMULADA_2026-08-02.md`.
+
+### Validacion
+
+- Suite Playwright completa en Chrome escritorio y Pixel 7 simulado: `60/60` pruebas aprobadas con cuatro workers.
+- El modo normal `?demo=1` conserva las 86 escuelas piloto; la escuela ficticia aparece exclusivamente con `loadtest=1`.
+- En la ejecucion integral concurrente, las 300/300 imagenes volvieron a abrirse sin error: 39.426 ms en escritorio y 37.439 ms en Pixel 7 simulado.
+- Sintaxis JavaScript y `git diff --check` sin errores.
+
 ## 2026-08-02 - Correccion del transporte fotografico v1.7.1
 
 ### Diagnostico

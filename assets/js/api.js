@@ -100,6 +100,11 @@ function demoScope(data, payload = {}) {
   return { current, users, userCodes, assignments, schoolCodes, records, recordKeys, photos };
 }
 
+function demoPhotoView(photo) {
+  const { demoBase64, ...metadata } = photo;
+  return metadata;
+}
+
 function demoPerformance(data, teamFilter = '') {
   const individuals = data.users.filter((user) => user.rol === 'ENCUESTADOR' && (!teamFilter || user.equipo === teamFilter)).map((user) => {
     const records = data.records.filter((record) => record.codigoCensista === user.codigoCensista);
@@ -240,7 +245,8 @@ async function demoRequest(action, payload = {}) {
           ...payload.photo,
           recordKey: payload.photo.recordKey || `${payload.photo.codigoCensista}:${payload.photo.recordId}`,
           uploadedAt: now,
-          driveUrl: ''
+          driveUrl: '',
+          demoBase64: payload.base64 || ''
         });
       }
       saveDemo(data);
@@ -249,9 +255,16 @@ async function demoRequest(action, payload = {}) {
       {
         const scope = demoScope(data, payload);
         return scope.current.rol === 'ADMIN'
-          ? { records: data.records, photos: data.photos }
-          : { records: scope.records, photos: scope.photos };
+          ? { records: data.records, photos: data.photos.map(demoPhotoView) }
+          : { records: scope.records, photos: scope.photos.map(demoPhotoView) };
       }
+    case 'getPhotoContent': {
+      const scope = demoScope(data, payload);
+      const visiblePhotos = scope.current.rol === 'ADMIN' ? data.photos : scope.photos;
+      const photo = visiblePhotos.find((item) => item.fotoId === payload.fotoId);
+      if (!photo) throw new ApiError('La fotografia no existe o no esta autorizada.', 'PHOTO_NOT_FOUND');
+      return { fotoId: photo.fotoId, mimeType: photo.mimeType || 'image/jpeg', bytes: Number(photo.bytes || 0), base64: photo.demoBase64 || '' };
+    }
     case 'adminDashboard':
       {
       const scope = demoScope(data, payload);
@@ -467,6 +480,7 @@ export class ApiClient {
   saveRecord(record) { return this.request('saveRecord', { record }); }
   uploadPhoto(photo, base64) { return this.request('uploadPhoto', { photo, base64 }, { timeout: 90000 }); }
   listRecords(filters = {}) { return this.request('listRecords', filters); }
+  getPhotoContent(fotoId) { return this.request('getPhotoContent', { fotoId }, { timeout: 90000 }); }
   adminDashboard() { return this.request('adminDashboard'); }
   saveUser(user) { return this.request('saveUser', { user }); }
   setAvailability(codigoCensista, disponibleCampo, motivoIndisponibilidad = '') {

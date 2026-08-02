@@ -159,6 +159,25 @@ test('edita un registro sincronizado y continua la secuencia fotografica', async
   await expect(page.locator('.photo-id-preview')).toContainText(/-AM01-FT02/);
 });
 
+test('permite ver y ampliar las fotos sincronizadas desde la galeria', async ({ page }) => {
+  await page.locator('[data-action="select-school"]').first().click();
+  await page.locator('[data-action="start-record"]').click();
+  await page.locator('input[data-photo-input="EVIDENCIA"]').setInputFiles({
+    name: 'galeria.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#62a88d"/></svg>')
+  });
+  await page.getByRole('button', { name: /Finalizar y sincronizar/ }).click();
+  await expect(page.getByRole('heading', { name: 'Mi jornada' })).toBeVisible();
+  await page.locator('[data-view="photos"]:visible').first().click();
+  await expect(page.getByRole('heading', { name: 'Fotografias por escuela' })).toBeVisible();
+  await expect(page.locator('.gallery-card')).toHaveCount(1);
+  await expect.poll(() => page.locator('.gallery-image img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+  await page.locator('.gallery-image').click();
+  await expect(page.locator('.photo-dialog')).toBeVisible();
+  await expect(page.locator('.photo-dialog img')).toBeVisible();
+});
+
 test('muestra Editar para un registro antiguo con codigo numerico y sin recordKey', async ({ page }) => {
   await page.locator('[data-action="select-school"]').first().click();
   await page.locator('[data-action="start-record"]').click();

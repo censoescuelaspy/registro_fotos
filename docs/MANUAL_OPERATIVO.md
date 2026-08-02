@@ -71,6 +71,15 @@ Este archivo no carga informacion automaticamente en RUE. Se utiliza para revisi
 - En **Encuestadores** obtiene la lista de su supervisor y censistas asignados, con rol, estado, disponibilidad, escuelas, registros, fotos y ultimo acceso.
 - La capacidad de campo se calcula con los perfiles **ENCUESTADOR**; el supervisor aparece en la lista del equipo, pero no aumenta artificialmente la cantidad de personal que realiza fichas.
 - En **Logistica** solo aparecen las escuelas y las personas del equipo. Un supervisor puede redistribuir una escuela ya perteneciente a su equipo, pero no incorporar personas ni escuelas de otro equipo.
+
+## Consulta de fotografias sincronizadas
+
+1. Abra **Fotos** desde el menu o el icono de imagen de la barra superior. Tambien puede usar **Ver fotos** en una escuela o **Fotos** en un registro sincronizado.
+2. Seleccione la escuela y luego el registro. La galeria muestra todas las evidencias y hojas en papel activas asociadas.
+3. Pulse una imagen para ampliarla y cierre el visor con la **X** o la tecla Escape.
+4. El administrador puede consultar todas las escuelas. Supervisores y encuestadores solo pueden consultar las escuelas habilitadas para su equipo.
+
+Las imagenes permanecen privadas en Drive. La app las entrega mediante la sesion autenticada y no modifica los permisos de la carpeta.
 - La administracion mantiene la vista consolidada de todo el operativo. Los controles se aplican tambien en el servidor; ocultar una fila en pantalla no se considera un control de acceso suficiente.
 
 ## Numeracion

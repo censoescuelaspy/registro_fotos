@@ -11,11 +11,13 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 5. La app reduce la imagen y agrega un pie sin tapar la fotografia.
 6. El registro y las fotos se sincronizan; sin internet quedan en IndexedDB hasta recuperar conexion.
 7. Desde **Mi jornada** puede pulsar **Editar** en un registro sincronizado propio y continuar la secuencia de fotos sin perder los codigos anteriores. Los registros creados por otro integrante del equipo se identifican como **Solo lectura**.
+8. Desde **Fotos**, o desde el boton **Ver fotos** de una escuela o registro, puede seleccionar cualquier escuela y ficha de su ambito y ampliar toda su evidencia sincronizada.
 
 ## Operacion y supervision
 
 - Los campos, encabezados, indicadores y acciones principales incorporan ayuda emergente **(i)** basada en el manual operativo, accesible con teclado y adaptada a celular.
 - **Mi jornada** muestra avance personal, siguiente escuela, borradores, cola local, registros sincronizados, tiempos por ficha y KPI propios y del equipo.
+- **Fotos** presenta una galeria responsive por escuela y registro. El administrador ve el conjunto general; supervisores y encuestadores ven las escuelas autorizadas para su equipo.
 - **Control** consolida escuelas atendidas, registros, fotos, solicitudes, disponibilidad, rendimiento por censista y proyeccion de plazo. El supervisor recibe solo los datos de su equipo; el administrador conserva la vista general.
 - **Encuestadores** muestra al supervisor su propia lista de integrantes asignados. El administrador puede ver los 16 integrantes de los 8 equipos, crear, editar, activar y desactivar usuarios, mientras la cuenta administrativa principal permanece protegida.
 - **Logistica** administra la distribucion por equipo, filtra por territorio y estado, compara cargas, prepara rutas y guarda asignaciones por lote. Para el supervisor, catalogo, personas y cambios quedan limitados a su equipo.
@@ -55,6 +57,8 @@ Ejemplo de identificador:
 ```
 
 El mismo codigo se usa en la imagen, el nombre del archivo, Google Drive y Google Sheets. Las fotos binarias se conservan en una carpeta privada de Drive; la hoja contiene datos estructurados, vinculos y huellas SHA-256.
+
+La galeria no cambia esos permisos: solicita cada imagen al backend con la sesion vigente y la mantiene solo en memoria mientras se visualiza. No publica la carpeta ni genera enlaces anonimos de Drive.
 
 ## Componentes
 

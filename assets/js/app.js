@@ -59,6 +59,7 @@ const state = {
   drafts: [],
   queue: [],
   remote: { records: [], photos: [] },
+  gallery: { schoolCode: '', recordKey: '', content: {} },
   admin: null,
   adminLoading: false,
   adminFilters: {
@@ -203,7 +204,7 @@ async function loadRemoteRecords(allowCache = false) {
     return;
   }
   try {
-    state.remote = normalizeRemoteSchoolCodes(await api.listRecords({ codigoCensista: user.codigoCensista }));
+    state.remote = normalizeRemoteSchoolCodes(await api.listRecords());
     saveJson(APP_CONFIG.recordsCacheKey, { codigoCensista: user.codigoCensista, data: state.remote });
   } catch (error) {
     if (allowCache && cached?.codigoCensista === user.codigoCensista) {
@@ -318,6 +319,7 @@ function renderShell() {
     ['schools', 'map', 'Escuelas'],
     ['register', 'camera', 'Registrar'],
     ['pending', 'clipboard-list', 'Mi jornada'],
+    ['photos', 'images', 'Fotos'],
     ...(canAdmin ? [
       ['admin', 'layout-dashboard', 'Control'],
       ['surveyors', 'users', 'Encuestadores'],
@@ -344,6 +346,7 @@ function renderShell() {
         <button class="icon-btn sync-button ${state.queue.length ? 'has-badge' : ''}" data-action="sync" title="Sincronizar pendientes" aria-label="Sincronizar pendientes">
           ${icon('refresh-cw')}<span class="button-badge">${state.queue.length}</span>
         </button>
+        <button class="icon-btn" data-view="photos" title="Ver fotografias" aria-label="Ver fotografias">${icon('images')}</button>
         <button class="icon-btn" data-view="guide" title="Guia de campo" aria-label="Abrir guia de campo">${icon('circle-help')}</button>
         ${state.installPrompt ? `<button class="btn btn-quiet desktop-only" data-action="install">${icon('download')} Instalar</button>` : ''}
       </div>
@@ -379,6 +382,7 @@ function navButton(view, iconName, label, mobile = false, activeOverride = false
 function renderCurrentView() {
   if (state.view === 'register') return renderRegister();
   if (state.view === 'pending') return renderPending();
+  if (state.view === 'photos') return renderGallery();
   if (state.view === 'admin') return renderAdmin();
   if (state.view === 'surveyors') return renderSurveyors();
   if (state.view === 'logistics') return renderLogistics();
@@ -457,6 +461,7 @@ function renderSelectedSchool(school) {
     <div class="selected-school-stats"><span>${progress.registros || 0} registros</span><span>${progress.fotos || 0} fotos</span></div>
     <div class="button-row">
       <button class="btn btn-primary" data-action="start-record" data-school="${school.codigo}">${icon('camera')} Registrar</button>
+      <button class="btn btn-secondary" data-action="show-school-photos" data-school="${school.codigo}">${icon('images')} Ver fotos</button>
       <a class="btn btn-secondary" href="https://www.google.com/maps/dir/?api=1&destination=${school.latitud},${school.longitud}" target="_blank" rel="noopener">${icon('navigation')} Ir</a>
     </div>
   </article>`;
@@ -665,10 +670,52 @@ function renderSyncedRecordRow(record) {
   const school = schoolByCode(record.codigoEscuela);
   const own = isOwnRecord(record);
   const recordKey = recordKeyOf(record);
-  const actions = own && recordKey
-    ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="edit-record" data-record="${escapeHtml(recordKey)}">${icon('pencil')} Editar</button></div>`
-    : `<div class="list-card-actions"><span class="protected-label" title="Registro creado por otro integrante del equipo">${icon('eye', 14)} Solo lectura</span></div>`;
+  const actions = `<div class="list-card-actions">
+    <button class="btn btn-secondary" data-action="show-record-photos" data-record="${escapeHtml(recordKey)}">${icon('images')} Fotos</button>
+    ${own && recordKey
+      ? `<button class="btn btn-secondary" data-action="edit-record" data-record="${escapeHtml(recordKey)}">${icon('pencil')} Editar</button>`
+      : `<span class="protected-label" title="Registro creado por otro integrante del equipo">${icon('eye', 14)} Solo lectura</span>`}
+  </div>`;
   return `<article class="list-card"><div class="list-card-icon">${icon('cloud-upload')}</div><div><strong>${escapeHtml(record.recordId)}</strong><span>${escapeHtml(school?.nombre || record.codigoEscuela)} · ${record.cantidadFotos || 0} fotos</span><small>${statusLabel(record.estado)} · ${record.durationSeconds ? minutesLabel(record.durationSeconds / 60) : 'Tiempo no disponible'} · ${formatDateTime(record.updatedAt || record.syncedAt)}</small></div>${actions}</article>`;
+}
+
+function renderGallery() {
+  const records = state.remote?.records || [];
+  const schools = availableSchools().filter((school) => records.some((record) => record.codigoEscuela === school.codigo));
+  const fallbackSchool = state.selectedSchoolCode && schools.some((school) => school.codigo === state.selectedSchoolCode)
+    ? state.selectedSchoolCode : schools[0]?.codigo || '';
+  if (!schools.some((school) => school.codigo === state.gallery.schoolCode)) state.gallery.schoolCode = fallbackSchool;
+  const schoolRecords = records.filter((record) => record.codigoEscuela === state.gallery.schoolCode)
+    .sort((left, right) => String(right.updatedAt || right.syncedAt || '').localeCompare(String(left.updatedAt || left.syncedAt || '')));
+  if (!schoolRecords.some((record) => recordKeyOf(record) === state.gallery.recordKey)) {
+    state.gallery.recordKey = recordKeyOf(schoolRecords[0]) || '';
+  }
+  const selectedRecord = schoolRecords.find((record) => recordKeyOf(record) === state.gallery.recordKey);
+  const photos = (state.remote?.photos || []).filter((photo) => recordKeyOf(photo) === state.gallery.recordKey)
+    .sort((left, right) => Number(left.secuencia || 0) - Number(right.secuencia || 0));
+  const selectedSchool = schoolByCode(state.gallery.schoolCode);
+  return `<section class="view view-gallery">
+    <div class="view-heading"><div><p class="eyebrow">Evidencia sincronizada</p><h1>Fotografias por escuela</h1><p>Disponible para administradores, supervisores y encuestadores dentro de su ambito autorizado.</p></div><button class="btn btn-secondary" data-action="reload-gallery">${icon('rotate-cw')} Actualizar</button></div>
+    <div class="gallery-filters">
+      <label>Escuela<select data-gallery-school>${schools.map((school) => `<option value="${school.codigo}" ${school.codigo === state.gallery.schoolCode ? 'selected' : ''}>RUE ${escapeHtml(school.codigoRue || normalizeRueSchoolCode(school.codigo))} Â· ${escapeHtml(school.nombre)}</option>`).join('')}</select></label>
+      <label>Registro<select data-gallery-record ${schoolRecords.length ? '' : 'disabled'}>${schoolRecords.map((record) => `<option value="${escapeHtml(recordKeyOf(record))}" ${recordKeyOf(record) === state.gallery.recordKey ? 'selected' : ''}>${escapeHtml(record.recordId)} Â· ${record.cantidadFotos || 0} fotos</option>`).join('')}</select></label>
+    </div>
+    ${!schools.length ? renderEmpty('images', 'Aun no hay fotografias sincronizadas.', 'Cuando se sincronicen registros con fotos apareceran aqui.') : `
+      <section class="gallery-summary"><div><h2>${escapeHtml(selectedSchool?.nombre || state.gallery.schoolCode)}</h2><p>${selectedRecord ? `${escapeHtml(selectedRecord.recordId)} Â· ${statusLabel(selectedRecord.estado)} Â· censista ${escapeHtml(String(selectedRecord.codigoCensista || ''))}` : 'Seleccione un registro.'}</p></div><strong>${photos.length} ${photos.length === 1 ? 'foto' : 'fotos'}</strong></section>
+      <div class="gallery-grid">${photos.length ? photos.map(renderGalleryPhoto).join('') : renderEmpty('image-off', 'Este registro no tiene fotos activas.', 'Actualice la vista si la carga acaba de sincronizarse.')}</div>
+    `}
+  </section>`;
+}
+
+function renderGalleryPhoto(photo) {
+  const cached = state.gallery.content[photo.fotoId];
+  const image = cached?.dataUrl
+    ? `<img src="${cached.dataUrl}" alt="${escapeHtml(photo.codigoFoto || 'Fotografia del registro')}" loading="lazy">`
+    : `<div class="gallery-placeholder">${icon(cached?.error ? 'image-off' : 'loader-circle', 30)}<span>${cached?.error ? 'No se pudo cargar' : 'Cargando imagen...'}</span></div>`;
+  return `<article class="gallery-card" data-gallery-photo="${escapeHtml(photo.fotoId)}">
+    <button class="gallery-image" data-action="open-gallery-photo" data-photo="${escapeHtml(photo.fotoId)}" aria-label="Ampliar ${escapeHtml(photo.codigoFoto || 'fotografia')}">${image}</button>
+    <div class="gallery-card-copy"><strong>${escapeHtml(photo.codigoFoto || photo.nombreArchivo || 'Fotografia')}</strong><span>${escapeHtml(elementLabel(photo.tipoElemento))}${photo.numeroElemento ? ` ${escapeHtml(photo.numeroElemento)}` : ''} Â· ${photo.tipoFoto === 'HOJA_PAPEL' ? 'Hoja en papel' : 'Evidencia'}</span><small>${formatBytes(photo.bytes)} Â· ${formatDateTime(photo.capturedAt || photo.uploadedAt)}</small>${photo.notas ? `<p>${escapeHtml(photo.notas)}</p>` : ''}${cached?.error ? `<button class="btn btn-quiet" data-action="retry-gallery-photo" data-photo="${escapeHtml(photo.fotoId)}">${icon('rotate-cw')} Reintentar</button>` : ''}</div>
+  </article>`;
 }
 
 function renderMyPerformance(performance = {}) {
@@ -1059,6 +1106,7 @@ function mountView() {
     if (state.selectedSchoolCode) state.map.focusSchool(schoolByCode(state.selectedSchoolCode));
   }
   if (state.view === 'register') hydratePhotoPreviews();
+  if (state.view === 'photos') hydrateGalleryPhotos();
   if (operationsViews.has(state.view) && !state.admin && !state.adminLoading) loadAdmin();
 }
 
@@ -1332,6 +1380,51 @@ async function toggleUser(code, active) {
   toast(`Usuario ${active ? 'activado' : 'desactivado'}.`, 'success');
 }
 
+async function hydrateGalleryPhotos() {
+  const photos = (state.remote?.photos || []).filter((photo) => recordKeyOf(photo) === state.gallery.recordKey);
+  const pending = photos.filter((photo) => !state.gallery.content[photo.fotoId]?.dataUrl && !state.gallery.content[photo.fotoId]?.loading);
+  for (let index = 0; index < pending.length; index += 4) {
+    await Promise.all(pending.slice(index, index + 4).map((photo) => loadGalleryPhotoContent(photo)));
+  }
+}
+
+async function loadGalleryPhotoContent(photo) {
+  state.gallery.content[photo.fotoId] = { loading: true };
+  try {
+    const result = await api.getPhotoContent(photo.fotoId);
+    const mimeType = String(result.mimeType || '').toLowerCase();
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) || !result.base64) {
+      throw new Error('El servidor devolvio una imagen no valida.');
+    }
+    const dataUrl = `data:${mimeType};base64,${result.base64}`;
+    state.gallery.content[photo.fotoId] = { dataUrl, loading: false };
+    const button = document.querySelector(`[data-gallery-photo="${CSS.escape(photo.fotoId)}"] .gallery-image`);
+    if (button) button.innerHTML = `<img src="${dataUrl}" alt="${escapeHtml(photo.codigoFoto || 'Fotografia del registro')}" loading="lazy">`;
+  } catch (error) {
+    state.gallery.content[photo.fotoId] = { loading: false, error: error.message || 'No se pudo cargar.' };
+    const placeholder = document.querySelector(`[data-gallery-photo="${CSS.escape(photo.fotoId)}"] .gallery-placeholder`);
+    if (placeholder) placeholder.innerHTML = `${icon('image-off', 30)}<span>No se pudo cargar</span>`;
+    refreshIcons();
+  }
+}
+
+function openGalleryPhoto(fotoId) {
+  const cached = state.gallery.content[fotoId];
+  const photo = (state.remote?.photos || []).find((item) => item.fotoId === fotoId);
+  if (!cached?.dataUrl || !photo) {
+    toast('La fotografia todavia se esta cargando.', 'info');
+    return;
+  }
+  const dialog = document.createElement('dialog');
+  dialog.className = 'photo-dialog';
+  dialog.innerHTML = `<div class="photo-dialog-bar"><strong>${escapeHtml(photo.codigoFoto || 'Fotografia')}</strong><button class="icon-btn" aria-label="Cerrar">${icon('x')}</button></div><img src="${cached.dataUrl}" alt="${escapeHtml(photo.codigoFoto || 'Fotografia ampliada')}"><p>${escapeHtml(photo.notas || `${elementLabel(photo.tipoElemento)} ${photo.numeroElemento || ''}`)}</p>`;
+  dialog.querySelector('button').addEventListener('click', () => dialog.close());
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.append(dialog);
+  dialog.showModal();
+  refreshIcons();
+}
+
 async function toggleAvailability(code, available) {
   const user = (state.admin?.users || []).find((item) => String(item.codigoCensista) === String(code));
   if (!user) throw new Error('No se encontro el censista.');
@@ -1459,6 +1552,36 @@ async function handleClick(event) {
     state.selectedSchoolCode = canonicalSchoolCode(button.dataset.school);
     state.view = 'schools';
     render();
+  }
+  if (action === 'show-school-photos') {
+    state.selectedSchoolCode = canonicalSchoolCode(button.dataset.school);
+    state.gallery.schoolCode = state.selectedSchoolCode;
+    state.gallery.recordKey = '';
+    state.view = 'photos';
+    render();
+  }
+  if (action === 'show-record-photos') {
+    const record = (state.remote?.records || []).find((item) => recordKeyOf(item) === button.dataset.record);
+    if (!record) throw new Error('El registro ya no esta disponible.');
+    state.selectedSchoolCode = record.codigoEscuela;
+    state.gallery.schoolCode = record.codigoEscuela;
+    state.gallery.recordKey = recordKeyOf(record);
+    state.view = 'photos';
+    render();
+  }
+  if (action === 'open-gallery-photo') openGalleryPhoto(button.dataset.photo);
+  if (action === 'retry-gallery-photo') {
+    const photo = (state.remote?.photos || []).find((item) => item.fotoId === button.dataset.photo);
+    if (photo) {
+      delete state.gallery.content[photo.fotoId];
+      render();
+    }
+  }
+  if (action === 'reload-gallery') {
+    state.gallery.content = {};
+    await loadRemoteRecords(true);
+    render();
+    toast('Fotografias actualizadas.', 'success');
   }
   if (action === 'save-draft') await saveActiveDraft();
   if (action === 'capture-photo') {
@@ -1704,6 +1827,7 @@ async function logout() {
   setSession(null);
   state.bootstrap = null;
   state.remote = { records: [], photos: [] };
+  state.gallery = { schoolCode: '', recordKey: '', content: {} };
   state.admin = null;
   state.editingUserCode = '';
   state.logisticsOriginal = {};
@@ -1714,6 +1838,20 @@ async function logout() {
 }
 
 function handleChange(event) {
+  const gallerySchool = event.target.closest('[data-gallery-school]');
+  if (gallerySchool) {
+    state.gallery.schoolCode = canonicalSchoolCode(gallerySchool.value);
+    state.gallery.recordKey = '';
+    state.selectedSchoolCode = state.gallery.schoolCode;
+    render();
+    return;
+  }
+  const galleryRecord = event.target.closest('[data-gallery-record]');
+  if (galleryRecord) {
+    state.gallery.recordKey = galleryRecord.value;
+    render();
+    return;
+  }
   const adminFilter = event.target.closest('[data-admin-filter]');
   if (adminFilter) {
     state.adminFilters[adminFilter.dataset.adminFilter] = adminFilter.value;

@@ -37,6 +37,7 @@ test('el supervisor ve solo las escuelas y los integrantes de su equipo', async 
   await expect(page.locator('[data-action="select-school"]')).toHaveCount(1);
   await expect(page.locator('[data-action="select-school"][data-school="11007"]')).toBeVisible();
   await expect(page.locator('[data-action="select-school"][data-school="10038"]')).toHaveCount(0);
+  await expect(page.locator('[data-view="photos"]:visible').first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Control' }).click();
   await expect(page.getByRole('heading', { name: 'Resumen de Equipo 1', exact: true })).toBeVisible();
@@ -54,4 +55,15 @@ test('el supervisor ve solo las escuelas y los integrantes de su equipo', async 
   await page.locator('.operations-tab[data-view="logistics"]').click();
   await expect(page.getByRole('heading', { name: 'Logistica de campo', exact: true })).toBeVisible();
   await expect(page.locator('[data-logistics-assignment]')).toHaveCount(1);
+});
+
+test('el encuestador dispone de la galeria para sus escuelas autorizadas', async ({ page }) => {
+  await page.goto('/?demo=1');
+  await page.getByLabel('Usuario, codigo operativo o cedula').fill('2345678');
+  await page.getByLabel('Contrasena / PIN', { exact: true }).fill('1234');
+  await page.getByRole('button', { name: 'Ingresar' }).click();
+  await expect(page.getByRole('heading', { name: 'Escuelas asignadas', exact: true })).toBeVisible();
+  await page.locator('[data-view="photos"]:visible').first().click();
+  await expect(page.getByRole('heading', { name: 'Fotografias por escuela' })).toBeVisible();
+  await expect(page.locator('.view-gallery')).toBeVisible();
 });

@@ -45,6 +45,7 @@ function doPost(event) {
     else if (action === 'saveRecord') data = saveRecord_(payload.record || {}, session, client);
     else if (action === 'uploadPhoto') data = uploadPhoto_(payload.photo || {}, payload.base64 || '', session, client);
     else if (action === 'listRecords') data = listRecords_(payload, session);
+    else if (action === 'getPhotoContent') data = getPhotoContent_(payload, session);
     else if (action === 'adminDashboard') data = adminDashboard_(session);
     else if (action === 'saveUser') data = saveUser_(payload.user || {}, session, client);
     else if (action === 'setAvailability') data = setAvailability_(payload || {}, session, client);

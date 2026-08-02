@@ -445,3 +445,28 @@ function listRecords_(payload, session) {
   });
   return { records: records.map(recordView_), photos: photos.map(photoView_) };
 }
+
+function getPhotoContent_(payload, session) {
+  const fotoId = text_(payload && payload.fotoId, 'identificador de foto', 100, true);
+  const photo = objects_(SHEETS.PHOTOS).filter(function (row) {
+    return String(row.foto_id) === fotoId && !row.deleted_at && String(row.estado || 'ACTIVA') === 'ACTIVA';
+  })[0];
+  if (!photo) throw apiError_('PHOTO_NOT_FOUND', 'La fotografia no existe o ya no esta activa.');
+  requireSchoolAccess_(session, photo.codigo_escuela);
+  const mimeType = String(photo.mime_type || '').toLowerCase();
+  if (['image/jpeg', 'image/png', 'image/webp'].indexOf(mimeType) < 0) {
+    throw apiError_('PHOTO_FORMAT_INVALID', 'El formato de la fotografia no esta permitido.');
+  }
+  const driveFileId = text_(photo.drive_file_id, 'archivo de Drive', 200, true);
+  let blob;
+  try {
+    blob = DriveApp.getFileById(driveFileId).getBlob();
+  } catch (ignore) {
+    throw apiError_('PHOTO_FILE_MISSING', 'El archivo de la fotografia no esta disponible en Drive.');
+  }
+  const bytes = blob.getBytes();
+  if (!bytes.length || bytes.length > SYSTEM_CONFIG.MAX_PHOTO_BYTES) {
+    throw apiError_('PHOTO_TOO_LARGE', 'La fotografia supera el limite permitido.');
+  }
+  return { fotoId: fotoId, mimeType: mimeType, bytes: bytes.length, base64: Utilities.base64Encode(bytes) };
+}

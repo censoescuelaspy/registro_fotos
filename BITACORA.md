@@ -1,5 +1,35 @@
 # Bitacora
 
+## 2026-08-02 - Galeria autenticada por escuela y registro v1.7.0
+
+### Objetivo
+
+Permitir que administrador, supervisores y encuestadores consulten desde la app todas las fotografias sincronizadas de cualquier registro perteneciente a una escuela autorizada.
+
+### Implementado
+
+- Nueva vista **Fotos**, accesible desde el menu lateral, la barra superior, la escuela seleccionada y cada registro sincronizado.
+- Selectores encadenados de escuela y registro, tarjetas responsive con metadatos y visor ampliado.
+- Nueva accion backend `getPhotoContent`, que valida sesion, escuela, estado, formato y tamano antes de leer el archivo privado de Drive.
+- El administrador carga todos los registros; supervisor y encuestador conservan el alcance por asignaciones y equipo.
+- Las imagenes se solicitan en lotes de cuatro, se mantienen solo en memoria y la interfaz permite reintentar errores individuales.
+- Version de frontend, backend y cache PWA incrementada a `1.7.0`; el esquema permanece en `2026-08-01.2` porque no se agregaron columnas.
+
+### Validacion
+
+- Sintaxis de `assets/js/app.js` y `assets/js/api.js` aprobada; `git diff --check` sin errores.
+- Prueba backend de autorizacion: un supervisor obtiene la foto de su equipo y recibe rechazo al solicitar la de otro equipo.
+- Suite Playwright completa en copia temporal local: `58/58` pruebas aprobadas en Chrome de escritorio y Pixel 7, incluida carga y ampliacion de una foto real en modo demostracion.
+- La ejecucion desde la unidad sincronizada sigue impedida por archivos vacios preexistentes de `node_modules`; no afecta el codigo ni la publicacion estatica.
+
+### Publicacion
+
+- Identidad `clasp` confirmada: `dmeza.py@gmail.com`.
+- Backend subido con `clasp push -f`, version inmutable `18` y deployment productivo actualizado a `@18`, conservando la misma URL `/exec`.
+- `GET` y `POST health` productivos respondieron HTTP `200`, version `1.7.0`, esquema `2026-08-01.2` y `bootstrapRequired: false`.
+- Una solicitud anonima a `getPhotoContent` fue rechazada con `AUTH_REQUIRED`, confirmando que la nueva lectura binaria no queda abierta sin sesion.
+- La comprobacion autenticada con fotos reales se deja al smoke test del usuario operativo para no solicitar ni utilizar PIN de campo durante el despliegue.
+
 ## 2026-08-02 - Backend Apps Script v1.6.0 desplegado en produccion
 
 ### Objetivo

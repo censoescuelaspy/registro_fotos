@@ -136,8 +136,8 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
       { record_key: '3456789:R2', record_id: 'R2', codigo_censista: '3456789', codigo_escuela: '10038', estado: 'FINALIZADO', cantidad_fotos: 1 }
     ],
     FOTOS: [
-      { record_key: '2345678:R1', codigo_censista: '2345678', codigo_escuela: '11007' },
-      { record_key: '3456789:R2', codigo_censista: '3456789', codigo_escuela: '10038' }
+      { foto_id: 'F1', record_key: '2345678:R1', codigo_censista: '2345678', codigo_escuela: '11007', estado: 'ACTIVA', mime_type: 'image/jpeg', drive_file_id: 'D1' },
+      { foto_id: 'F2', record_key: '3456789:R2', codigo_censista: '3456789', codigo_escuela: '10038', estado: 'ACTIVA', mime_type: 'image/jpeg', drive_file_id: 'D2' }
     ]
   };
   const context = {
@@ -149,6 +149,10 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
     boolean_: (value) => value === true,
     digits_: (value) => String(value || '').replace(/\D/g, ''),
     text_: (value) => String(value || ''),
+    apiError_: (code, message) => Object.assign(new Error(message), { apiCode: code }),
+    SYSTEM_CONFIG: { MAX_PHOTO_BYTES: 15 * 1024 * 1024 },
+    Utilities: { base64Encode: (bytes) => Buffer.from(bytes).toString('base64') },
+    DriveApp: { getFileById: () => ({ getBlob: () => ({ getBytes: () => [1, 2, 3] }) }) },
     publicUser_: (user) => ({ codigoCensista: user.codigo_censista, rol: user.rol, equipo: user.equipo }),
     performanceForUser_: () => ({ individual: null, team: null })
   };
@@ -170,4 +174,6 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
   expect(listed.records[0].codigoCensista).toBe('2345678');
   expect(listed.photos).toHaveLength(1);
   expect(listed.photos[0].codigoCensista).toBe('2345678');
+  expect(context.getPhotoContent_({ fotoId: 'F1' }, session)).toMatchObject({ fotoId: 'F1', mimeType: 'image/jpeg', base64: 'AQID' });
+  expect(() => context.getPhotoContent_({ fotoId: 'F2' }, session)).toThrow(/no esta asignada/i);
 });

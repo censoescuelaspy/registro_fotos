@@ -28,6 +28,14 @@ Permitir que censistas y supervisores consulten instrucciones del manual dentro 
 - La suite se ejecuta en una copia temporal local porque la unidad sincronizada materializa archivos vacios dentro de `node_modules`.
 - El commit y push fueron solicitados para esta intervencion. El despliegue del backend Apps Script no forma parte del alcance autorizado y debe realizarse por separado para activar sus controles del lado servidor.
 
+### Publicacion verificada
+
+- Codigo funcional publicado en `main` mediante el commit `91932c6` (`feat: integrar RUE, ayuda contextual y supervision por equipo`).
+- Los workflows **Publicar GitHub Pages** `30729005401` y **pages-build-deployment** `30729005215` concluyeron correctamente.
+- La URL publica `https://censoescuelaspy.github.io/registro_fotos/` respondio HTTP 200 para pagina, configuracion, aplicacion, ayuda y service worker; todos sirven version/cache `1.6.0`.
+- Smoke test sobre la URL publica en vista movil: ayuda visible; perfil supervisor de demostracion con una escuela del Equipo 1; Ana Lopez visible y Bruno Diaz, del Equipo 2, ausente.
+- GitHub Actions emitio una advertencia no bloqueante por la futura retirada de Node.js 20 en acciones oficiales; la publicacion finalizo con exito, pero el workflow debera actualizar sus versiones cuando GitHub publique reemplazos estables.
+
 ## 2026-08-01 - Compatibilidad bidireccional de codigos v1.5.1
 
 ### Objetivo

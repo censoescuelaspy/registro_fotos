@@ -28,6 +28,8 @@ Permitir que administrador, supervisores y encuestadores consulten desde la app 
 - Backend subido con `clasp push -f`, version inmutable `18` y deployment productivo actualizado a `@18`, conservando la misma URL `/exec`.
 - `GET` y `POST health` productivos respondieron HTTP `200`, version `1.7.0`, esquema `2026-08-01.2` y `bootstrapRequired: false`.
 - Una solicitud anonima a `getPhotoContent` fue rechazada con `AUTH_REQUIRED`, confirmando que la nueva lectura binaria no queda abierta sin sesion.
+- Frontend funcional publicado desde el commit `632a009` mediante los workflows **Publicar GitHub Pages** `30740966888` y **pages-build-deployment** `30740966603`, ambos concluidos correctamente.
+- La URL `https://censoescuelaspy.github.io/registro_fotos/` respondio HTTP `200` y sirvio version `1.7.0`, build `2026-08-02`, cache `cialpa-fotos-v1.7.0`, la vista **Fotografias por escuela** y la llamada `getPhotoContent`.
 - La comprobacion autenticada con fotos reales se deja al smoke test del usuario operativo para no solicitar ni utilizar PIN de campo durante el despliegue.
 
 ## 2026-08-02 - Backend Apps Script v1.6.0 desplegado en produccion

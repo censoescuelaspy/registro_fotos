@@ -61,6 +61,7 @@ function setupSystem_() {
   });
   ensureConfigValues_();
   seedSchools_();
+  backfillCompatibilityCodes_();
   applyValidations_();
   hideSensitiveColumns_();
   const folder = rootFolder_();
@@ -111,10 +112,10 @@ function formatSheet_(sheet, columnCount) {
   const widths = {
     CONFIG: [180, 280, 390, 180],
     USUARIOS: [130, 170, 170, 120, 90, 90, 80, 130, 175, 175, 175, 110, 110, 260, 175],
-    ESCUELAS: [100, 320, 120, 180, 90, 200, 110, 110, 90, 100, 110, 175, 175],
+    ESCUELAS: [100, 320, 120, 180, 90, 200, 110, 110, 90, 100, 110, 175, 175, 110, 130, 240, 110],
     ASIGNACIONES: [220, 130, 110, 80, 175, 130, 240, 175],
-    REGISTROS: [250, 250, 220, 110, 130, 90, 80, 70, 70, 80, 150, 120, 260, 260, 110, 110, 90, 90, 90, 175, 175, 175, 220, 175, 175, 110],
-    FOTOS: [220, 220, 250, 250, 110, 130, 90, 80, 70, 70, 80, 110, 160, 100, 110, 80, 300, 100, 320, 110, 90, 180, 220, 250, 200, 110, 110, 90, 175, 175, 110, 250, 175],
+    REGISTROS: [250, 250, 220, 110, 130, 90, 80, 70, 70, 80, 150, 120, 260, 260, 110, 110, 90, 90, 90, 175, 175, 175, 220, 175, 175, 110, 110, 130, 190, 360],
+    FOTOS: [220, 220, 250, 250, 110, 130, 90, 80, 70, 70, 80, 110, 160, 100, 110, 80, 300, 100, 320, 110, 90, 180, 220, 250, 200, 110, 110, 90, 175, 175, 110, 250, 175, 110, 130],
     SOLICITUDES: [220, 130, 170, 170, 130, 90, 90, 175, 110, 130, 175, 250]
   }[sheet.getName()];
   if (widths) widths.forEach(function (width, index) { if (index < columnCount) sheet.setColumnWidth(index + 1, width); });
@@ -182,7 +183,10 @@ function seedSchools_() {
   const names = headers_(SHEETS.SCHOOLS);
   const existingRows = objects_(SHEETS.SCHOOLS);
   const byCode = {};
-  existingRows.forEach(function (row) { byCode[String(row.codigo)] = row; });
+  existingRows.forEach(function (row) {
+    const catalogSchool = schoolByAnyCode_(row.codigo, PILOT_SCHOOLS);
+    byCode[String(catalogSchool ? catalogSchool.codigo : row.codigo)] = row;
+  });
   PILOT_SCHOOLS.forEach(function (school) {
     const previous = byCode[school.codigo] || {};
     byCode[school.codigo] = {
@@ -198,10 +202,17 @@ function seedSchools_() {
       orden_muestra: school.ordenMuestra,
       estado: previous.estado || 'ACTIVA',
       created_at: previous.created_at || nowIso_(),
-      updated_at: nowIso_()
+      updated_at: nowIso_(),
+      codigo_rue: school.codigoRue || String(school.codigo || '').padStart(7, '0'),
+      sitio_id: school.sitioId || '',
+      codigos_rue_sitio: (school.codigosRueSitio || []).join('|'),
+      sede_compartida: school.sedeCompartida === true
     };
   });
-  const orderedCodes = existingRows.map(function (row) { return String(row.codigo); });
+  const orderedCodes = existingRows.map(function (row) {
+    const catalogSchool = schoolByAnyCode_(row.codigo, PILOT_SCHOOLS);
+    return String(catalogSchool ? catalogSchool.codigo : row.codigo);
+  }).filter(function (code, index, codes) { return code && codes.indexOf(code) === index; });
   PILOT_SCHOOLS.forEach(function (school) {
     if (orderedCodes.indexOf(school.codigo) < 0) orderedCodes.push(school.codigo);
   });
@@ -210,6 +221,55 @@ function seedSchools_() {
     return names.map(function (name) { return safeCell_(row[name]); });
   });
   if (values.length) sheet.getRange(2, 1, values.length, names.length).setValues(values);
+  if (existingRows.length > values.length) {
+    sheet.getRange(2 + values.length, 1, existingRows.length - values.length, names.length).clearContent();
+  }
+}
+
+function backfillCompatibilityCodes_() {
+  const catalog = objects_(SHEETS.SCHOOLS);
+  const updateRows = function (sheetName, transform) {
+    const sheet = spreadsheet_().getSheetByName(sheetName);
+    const names = headers_(sheetName);
+    const rows = objects_(sheetName);
+    if (!rows.length) return;
+    const values = rows.map(function (row) {
+      const updated = transform(row) || row;
+      return names.map(function (name) { return safeCell_(updated[name]); });
+    });
+    sheet.getRange(2, 1, values.length, names.length).setValues(values);
+  };
+
+  updateRows(SHEETS.ASSIGNMENTS, function (row) {
+    const school = schoolByAnyCode_(row.codigo_escuela, catalog);
+    if (school) row.codigo_escuela = String(school.codigo || '');
+    return row;
+  });
+
+  updateRows(SHEETS.RECORDS, function (row) {
+    const school = schoolByAnyCode_(row.codigo_escuela, catalog);
+    if (!school) return row;
+    const appCode = String(school.codigo || '');
+    const rueCode = String(school.codigo_rue || canonicalRueCode_(appCode));
+    const section = String(row.rue_seccion || rueSectionForSpace_(row.tipo_espacio));
+    row.codigo_escuela = appCode;
+    row.codigo_rue = rueCode;
+    row.sitio_id = String(school.sitio_id || '');
+    row.rue_seccion = section;
+    if (section && row.bloque !== '' && row.piso !== '' && row.espacio !== '') {
+      row.rue_clave_espacio = rueSpaceKey_(rueCode, section, row.bloque, row.piso, row.espacio);
+    }
+    return row;
+  });
+
+  updateRows(SHEETS.PHOTOS, function (row) {
+    const school = schoolByAnyCode_(row.codigo_escuela, catalog);
+    if (!school) return row;
+    row.codigo_escuela = String(school.codigo || '');
+    row.codigo_rue = String(school.codigo_rue || canonicalRueCode_(school.codigo));
+    row.sitio_id = String(school.sitio_id || '');
+    return row;
+  });
 }
 
 function rootFolder_() {

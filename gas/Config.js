@@ -1,7 +1,7 @@
 const SYSTEM_CONFIG = Object.freeze({
   APP_NAME: 'CIALPA Fotos',
-  APP_VERSION: '1.4.0',
-  SCHEMA_VERSION: '2026-07-25.2',
+  APP_VERSION: '1.6.0',
+  SCHEMA_VERSION: '2026-08-01.2',
   SPREADSHEET_ID: '1R_vG-q96SbzoYmMg9AL-PMY1YUeSyRTl5tJSfuGNqUo',
   ROOT_FOLDER_NAME: 'CIALPA_REGISTRO_FOTOS',
   SESSION_HOURS: 12,
@@ -12,7 +12,7 @@ const SYSTEM_CONFIG = Object.freeze({
     'http://127.0.0.1:4173',
     'http://localhost:4173'
   ],
-  CACHE_SCHEMA_KEY: 'schema-ready-2026-07-25.2'
+  CACHE_SCHEMA_KEY: 'schema-ready-2026-08-01.2'
 });
 
 const SHEETS = Object.freeze({
@@ -40,7 +40,8 @@ const HEADERS = Object.freeze({
   ],
   ESCUELAS: [
     'codigo', 'nombre', 'departamento', 'distrito', 'zona', 'localidad', 'latitud',
-    'longitud', 'es_muestra', 'orden_muestra', 'estado', 'created_at', 'updated_at'
+    'longitud', 'es_muestra', 'orden_muestra', 'estado', 'created_at', 'updated_at',
+    'codigo_rue', 'sitio_id', 'codigos_rue_sitio', 'sede_compartida'
   ],
   ASIGNACIONES: [
     'assignment_id', 'codigo_censista', 'codigo_escuela', 'activo', 'fecha_asignacion',
@@ -51,7 +52,8 @@ const HEADERS = Object.freeze({
     'numero_formulario', 'numero_hoja', 'bloque', 'piso', 'espacio', 'tipo_espacio',
     'estado', 'observaciones', 'danos_fallas', 'latitud_captura', 'longitud_captura',
     'precision_m', 'cantidad_fotos', 'cantidad_hojas_papel', 'created_at', 'updated_at',
-    'synced_at', 'device_id', 'started_at', 'completed_at', 'duration_seconds'
+    'synced_at', 'device_id', 'started_at', 'completed_at', 'duration_seconds',
+    'codigo_rue', 'sitio_id', 'rue_seccion', 'rue_clave_espacio'
   ],
   FOTOS: [
     'foto_id', 'idempotency_key', 'record_key', 'record_id', 'codigo_escuela',
@@ -59,7 +61,7 @@ const HEADERS = Object.freeze({
     'tipo_foto', 'tipo_elemento', 'numero_elemento', 'codigo_elemento', 'secuencia',
     'codigo_foto', 'etiqueta_impresa', 'nombre_archivo', 'mime_type', 'bytes', 'sha256',
     'drive_file_id', 'drive_url', 'thumbnail_url', 'latitud', 'longitud', 'precision_m',
-    'captured_at', 'uploaded_at', 'estado', 'notas', 'deleted_at'
+    'captured_at', 'uploaded_at', 'estado', 'notas', 'deleted_at', 'codigo_rue', 'sitio_id'
   ],
   SOLICITUDES: [
     'solicitud_id', 'codigo_censista', 'nombres', 'apellidos', 'telefono', 'pin_salt',

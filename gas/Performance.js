@@ -63,15 +63,18 @@ function performanceForMember_(user, records, photos, assignedCount) {
   };
 }
 
-function performanceDashboard_() {
+function performanceDashboard_(catalog, teamFilter) {
+  const requestedTeam = String(teamFilter || '').trim();
   const users = objects_(SHEETS.USERS).filter(function (user) {
-    return active_(user.activo) && String(user.rol) !== ROLE.ADMIN;
+    return active_(user.activo) && String(user.rol) === ROLE.SURVEYOR
+      && (!requestedTeam || String(user.equipo || '').trim() === requestedTeam);
   });
   const records = objects_(SHEETS.RECORDS);
   const photos = objects_(SHEETS.PHOTOS);
   const assignments = objects_(SHEETS.ASSIGNMENTS).filter(function (item) {
     return active_(item.activo);
   });
+  const schoolCatalog = catalog || objects_(SHEETS.SCHOOLS);
   const usersByCode = {};
   users.forEach(function (user) { usersByCode[String(user.codigo_censista)] = user; });
   const assignedByTeam = {};
@@ -79,7 +82,8 @@ function performanceDashboard_() {
     const owner = usersByCode[String(assignment.codigo_censista)];
     const team = owner ? String(owner.equipo || '') : '';
     if (!assignedByTeam[team]) assignedByTeam[team] = {};
-    assignedByTeam[team][String(assignment.codigo_escuela)] = true;
+    const schoolCode = canonicalAppSchoolCode_(assignment.codigo_escuela, schoolCatalog) || String(assignment.codigo_escuela);
+    assignedByTeam[team][schoolCode] = true;
   });
   const individuals = users.map(function (user) {
     const team = String(user.equipo || '');
@@ -99,7 +103,8 @@ function performanceDashboard_() {
     const touched = {};
     records.forEach(function (row) {
       const user = usersByCode[String(row.codigo_censista)];
-      if (user && String(user.equipo || '') === team) touched[String(row.codigo_escuela)] = true;
+      const schoolCode = canonicalAppSchoolCode_(row.codigo_escuela, schoolCatalog) || String(row.codigo_escuela);
+      if (user && String(user.equipo || '') === team) touched[schoolCode] = true;
     });
     return {
       equipo: team,

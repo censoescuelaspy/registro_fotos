@@ -1,10 +1,22 @@
 {
-  "schemaVersion": 1,
-  "generatedAt": "2026-07-18T16:40:09+00:00",
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-02T01:13:03+00:00",
   "source": "Muestra_CIALPA_Capital_Central_RUE_2026_2026-07-16.xlsx",
   "sourceSha256": "8b0c9994985a644a860c0f48113750281e53cd0a9f43c777448abca4eb49db0a",
+  "sources": [
+    {
+      "name": "Muestra_CIALPA_Capital_Central_RUE_2026_2026-07-16.xlsx",
+      "sha256": "8b0c9994985a644a860c0f48113750281e53cd0a9f43c777448abca4eb49db0a"
+    },
+    {
+      "name": "LISTADO_ESCUELAS_CIALPA_CODIGO_AULAS_2026-07-22.xlsx",
+      "sha256": "7924d6e8bbb9ea7c11b6e29ac537808d5a8d39dd8f8153a6e3a29c5c0497ba10"
+    }
+  ],
   "scope": "Muestra piloto Capital y Central",
   "total": 86,
+  "physicalSites": 85,
+  "sharedSites": 1,
   "byDepartment": {
     "CAPITAL": 15,
     "CENTRAL": 71
@@ -12,6 +24,17 @@
   "schools": [
     {
       "codigo": "11007",
+      "codigoRue": "0011007",
+      "sitioId": "CIALPA-S001",
+      "numeroSitio": 1,
+      "codigosSitio": [
+        "11007"
+      ],
+      "codigosRueSitio": [
+        "0011007"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 44,
       "nombre": "COLEGIO NACIONAL DE E.M.D. PRESIDENTE FRANCO",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -23,6 +46,17 @@
     },
     {
       "codigo": "10038",
+      "codigoRue": "0010038",
+      "sitioId": "CIALPA-S002",
+      "numeroSitio": 2,
+      "codigosSitio": [
+        "10038"
+      ],
+      "codigosRueSitio": [
+        "0010038"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 4,
       "nombre": "CENTRO DE EDUCACIÓN MEDIA PARA PERSONAS JÓVENES Y ADULTAS N° 116 JOSÉ BERGES",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -34,6 +68,17 @@
     },
     {
       "codigo": "12110",
+      "codigoRue": "0012110",
+      "sitioId": "CIALPA-S003",
+      "numeroSitio": 3,
+      "codigosSitio": [
+        "12110"
+      ],
+      "codigosRueSitio": [
+        "0012110"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 11,
       "nombre": "ESCUELA BÁSICA N° 203 PROFESOR CLETO ROMERO",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -45,6 +90,17 @@
     },
     {
       "codigo": "15038",
+      "codigoRue": "0015038",
+      "sitioId": "CIALPA-S004",
+      "numeroSitio": 4,
+      "codigosSitio": [
+        "15038"
+      ],
+      "codigosRueSitio": [
+        "0015038"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 10,
       "nombre": "ESCUELA BÁSICA N° 3620 SAN PEDRO",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -56,6 +112,17 @@
     },
     {
       "codigo": "15066",
+      "codigoRue": "0015066",
+      "sitioId": "CIALPA-S005",
+      "numeroSitio": 5,
+      "codigosSitio": [
+        "15066"
+      ],
+      "codigosRueSitio": [
+        "0015066"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 7,
       "nombre": "COLEGIO NACIONAL DE E.M.D. SANTÍSIMA TRINIDAD",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -67,6 +134,17 @@
     },
     {
       "codigo": "1101029",
+      "codigoRue": "1101029",
+      "sitioId": "CIALPA-S006",
+      "numeroSitio": 6,
+      "codigosSitio": [
+        "1101029"
+      ],
+      "codigosRueSitio": [
+        "1101029"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 32,
       "nombre": "ESCUELA BÁSICA N° 3725 SAN JOSÉ",
       "departamento": "CENTRAL",
       "distrito": "AREGUÁ",
@@ -78,6 +156,17 @@
     },
     {
       "codigo": "1116023",
+      "codigoRue": "1116023",
+      "sitioId": "CIALPA-S007",
+      "numeroSitio": 7,
+      "codigosSitio": [
+        "1116023"
+      ],
+      "codigosRueSitio": [
+        "1116023"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 1,
       "nombre": "ESCUELA BÁSICA N° 5918 STELLA MARIS",
       "departamento": "CENTRAL",
       "distrito": "VILLETA",
@@ -89,6 +178,17 @@
     },
     {
       "codigo": "1119039",
+      "codigoRue": "1119039",
+      "sitioId": "CIALPA-S008",
+      "numeroSitio": 8,
+      "codigosSitio": [
+        "1119039"
+      ],
+      "codigosRueSitio": [
+        "1119039"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 17,
       "nombre": "ESCUELA BÁSICA N° 7437 SAN FRANCISCO",
       "departamento": "CENTRAL",
       "distrito": "JULIÁN AUGUSTO SALDÍVAR",
@@ -100,6 +200,17 @@
     },
     {
       "codigo": "1118029",
+      "codigoRue": "1118029",
+      "sitioId": "CIALPA-S009",
+      "numeroSitio": 9,
+      "codigosSitio": [
+        "1118029"
+      ],
+      "codigosRueSitio": [
+        "1118029"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 8,
       "nombre": "ESCUELA BÁSICA N° 6931 FUTURO DE LA PATRIA",
       "departamento": "CENTRAL",
       "distrito": "YPANÉ",
@@ -111,6 +222,17 @@
     },
     {
       "codigo": "1105019",
+      "codigoRue": "1105019",
+      "sitioId": "CIALPA-S010",
+      "numeroSitio": 10,
+      "codigosSitio": [
+        "1105019"
+      ],
+      "codigosRueSitio": [
+        "1105019"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 10,
       "nombre": "ESCUELA BÁSICA N° 2403 SAN JUAN BAUTISTA",
       "departamento": "CENTRAL",
       "distrito": "ITÁ",
@@ -122,6 +244,17 @@
     },
     {
       "codigo": "1118033",
+      "codigoRue": "1118033",
+      "sitioId": "CIALPA-S011",
+      "numeroSitio": 11,
+      "codigosSitio": [
+        "1118033"
+      ],
+      "codigosRueSitio": [
+        "1118033"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 11,
       "nombre": "ESCUELA BÁSICA N° 7460 SEBASTIÁN SAMANIEGO",
       "departamento": "CENTRAL",
       "distrito": "YPANÉ",
@@ -133,6 +266,17 @@
     },
     {
       "codigo": "1118009",
+      "codigoRue": "1118009",
+      "sitioId": "CIALPA-S012",
+      "numeroSitio": 12,
+      "codigosSitio": [
+        "1118009"
+      ],
+      "codigosRueSitio": [
+        "1118009"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 23,
       "nombre": "ESCUELA BÁSICA N° 5599 SAN PEDRO APÓSTOL",
       "departamento": "CENTRAL",
       "distrito": "YPANÉ",
@@ -144,6 +288,17 @@
     },
     {
       "codigo": "1113006",
+      "codigoRue": "1113006",
+      "sitioId": "CIALPA-S013",
+      "numeroSitio": 13,
+      "codigosSitio": [
+        "1113006"
+      ],
+      "codigosRueSitio": [
+        "1113006"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 36,
       "nombre": "COLEGIO NACIONAL DE E.M.D. ARQ. TOMÁS ROMERO PEREIRA",
       "departamento": "CENTRAL",
       "distrito": "SAN ANTONIO",
@@ -155,6 +310,17 @@
     },
     {
       "codigo": "1102028",
+      "codigoRue": "1102028",
+      "sitioId": "CIALPA-S014",
+      "numeroSitio": 14,
+      "codigosSitio": [
+        "1102028"
+      ],
+      "codigosRueSitio": [
+        "1102028"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 26,
       "nombre": "ESCUELA BÁSICA N° 3443 SAN JOSÉ OBRERO",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -166,6 +332,17 @@
     },
     {
       "codigo": "1103063",
+      "codigoRue": "1103063",
+      "sitioId": "CIALPA-S015",
+      "numeroSitio": 15,
+      "codigosSitio": [
+        "1103063"
+      ],
+      "codigosRueSitio": [
+        "1103063"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 28,
       "nombre": "ESCUELA BÁSICA N° 144 COMANDANTE HEBER LEO NOWAK",
       "departamento": "CENTRAL",
       "distrito": "FERNANDO DE LA MORA",
@@ -177,6 +354,17 @@
     },
     {
       "codigo": "1114074",
+      "codigoRue": "1114074",
+      "sitioId": "CIALPA-S016",
+      "numeroSitio": 16,
+      "codigosSitio": [
+        "1114074"
+      ],
+      "codigosRueSitio": [
+        "1114074"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 19,
       "nombre": "ESCUELA BÁSICA N° 600 SAN JOSÉ",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -188,6 +376,17 @@
     },
     {
       "codigo": "1102033",
+      "codigoRue": "1102033",
+      "sitioId": "CIALPA-S017",
+      "numeroSitio": 17,
+      "codigosSitio": [
+        "1102033"
+      ],
+      "codigosRueSitio": [
+        "1102033"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 82,
       "nombre": "ESCUELA BÁSICA N° 88 ENRIQUE SOLER",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -199,6 +398,17 @@
     },
     {
       "codigo": "1105002",
+      "codigoRue": "1105002",
+      "sitioId": "CIALPA-S018",
+      "numeroSitio": 18,
+      "codigosSitio": [
+        "1105002"
+      ],
+      "codigosRueSitio": [
+        "1105002"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 30,
       "nombre": "ESCUELA BÁSICA N° 89 REPÚBLICA DE COSTA RICA",
       "departamento": "CENTRAL",
       "distrito": "ITÁ",
@@ -210,6 +420,17 @@
     },
     {
       "codigo": "15030",
+      "codigoRue": "0015030",
+      "sitioId": "CIALPA-S019",
+      "numeroSitio": 19,
+      "codigosSitio": [
+        "15030"
+      ],
+      "codigosRueSitio": [
+        "0015030"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 19,
       "nombre": "ESCUELA BÁSICA N° 1008 GENERAL BERNARDINO CABALLERO",
       "departamento": "CENTRAL",
       "distrito": "MARIANO ROQUE ALONSO",
@@ -221,6 +442,17 @@
     },
     {
       "codigo": "1114034",
+      "codigoRue": "1114034",
+      "sitioId": "CIALPA-S020",
+      "numeroSitio": 20,
+      "codigosSitio": [
+        "1114034"
+      ],
+      "codigosRueSitio": [
+        "1114034"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 32,
       "nombre": "CENTRO REGIONAL DE EDUCACIÓN SATURIO RÍOS - ESCUELA ANEXA TOMASA FERREIRA DE MEZA",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -232,6 +464,17 @@
     },
     {
       "codigo": "1703542",
+      "codigoRue": "1703542",
+      "sitioId": "CIALPA-S021",
+      "numeroSitio": 21,
+      "codigosSitio": [
+        "1703542"
+      ],
+      "codigosRueSitio": [
+        "1703542"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 2,
       "nombre": "CENTRO DE EDUCACION ESPECIAL DANIEL ROTELA SALINAS",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -243,6 +486,17 @@
     },
     {
       "codigo": "1704421",
+      "codigoRue": "1704421",
+      "sitioId": "CIALPA-S022",
+      "numeroSitio": 22,
+      "codigosSitio": [
+        "1704421"
+      ],
+      "codigosRueSitio": [
+        "1704421"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 2,
       "nombre": "CENTRO DE EDUCACIÓN MEDIA PARA PERSONAS JÓVENES Y ADULTAS N° 22",
       "departamento": "CENTRAL",
       "distrito": "JULIÁN AUGUSTO SALDÍVAR",
@@ -254,6 +508,17 @@
     },
     {
       "codigo": "1102044",
+      "codigoRue": "1102044",
+      "sitioId": "CIALPA-S023",
+      "numeroSitio": 23,
+      "codigosSitio": [
+        "1102044"
+      ],
+      "codigosRueSitio": [
+        "1102044"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 3,
       "nombre": "CENTRO DE EDUCACIÓN BÁSICA PARA PERSONAS JÓVENES Y ADULTAS N° 11-156",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -265,6 +530,17 @@
     },
     {
       "codigo": "1114079",
+      "codigoRue": "1114079",
+      "sitioId": "CIALPA-S024",
+      "numeroSitio": 24,
+      "codigosSitio": [
+        "1114079"
+      ],
+      "codigosRueSitio": [
+        "1114079"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 10,
       "nombre": "ESCUELA BÁSICA N° 4199 MARÍA AUXILIADORA",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -276,6 +552,17 @@
     },
     {
       "codigo": "1102123",
+      "codigoRue": "1102123",
+      "sitioId": "CIALPA-S025",
+      "numeroSitio": 25,
+      "codigosSitio": [
+        "1102123"
+      ],
+      "codigosRueSitio": [
+        "1102123"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 6,
       "nombre": "ESCUELA BÁSICA N° 6418 MARÍA AUXILIADORA",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -287,6 +574,17 @@
     },
     {
       "codigo": "1117006",
+      "codigoRue": "1117006",
+      "sitioId": "CIALPA-S026",
+      "numeroSitio": 26,
+      "codigosSitio": [
+        "1117006"
+      ],
+      "codigosRueSitio": [
+        "1117006"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 11,
       "nombre": "ESCUELA BÁSICA N° 608 SANTA ROSA",
       "departamento": "CENTRAL",
       "distrito": "YPACARAÍ",
@@ -298,6 +596,17 @@
     },
     {
       "codigo": "1703745",
+      "codigoRue": "1703745",
+      "sitioId": "CIALPA-S027",
+      "numeroSitio": 27,
+      "codigosSitio": [
+        "1703745"
+      ],
+      "codigosRueSitio": [
+        "1703745"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 6,
       "nombre": "COLEGIO NACIONAL SAGRADO CORAZÓN DE JESÚS",
       "departamento": "CENTRAL",
       "distrito": "VILLA ELISA",
@@ -309,6 +618,17 @@
     },
     {
       "codigo": "1104022",
+      "codigoRue": "1104022",
+      "sitioId": "CIALPA-S028",
+      "numeroSitio": 28,
+      "codigosSitio": [
+        "1104022"
+      ],
+      "codigosRueSitio": [
+        "1104022"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 8,
       "nombre": "ESCUELA BÁSICA N° 7088 PROFESOR PEDRO DENIS RIVEROS",
       "departamento": "CENTRAL",
       "distrito": "GUARAMBARÉ",
@@ -320,6 +640,17 @@
     },
     {
       "codigo": "1114010",
+      "codigoRue": "1114010",
+      "sitioId": "CIALPA-S029",
+      "numeroSitio": 29,
+      "codigosSitio": [
+        "1114010"
+      ],
+      "codigosRueSitio": [
+        "1114010"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 10,
       "nombre": "ESCUELA BÁSICA N° 4203 15 DE MAYO",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -331,6 +662,17 @@
     },
     {
       "codigo": "1103092",
+      "codigoRue": "1103092",
+      "sitioId": "CIALPA-S030",
+      "numeroSitio": 30,
+      "codigosSitio": [
+        "1103092"
+      ],
+      "codigosRueSitio": [
+        "1103092"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 4,
       "nombre": "ESCUELA BÁSICA N° 4693 SAN BALTAZAR",
       "departamento": "CENTRAL",
       "distrito": "FERNANDO DE LA MORA",
@@ -342,6 +684,17 @@
     },
     {
       "codigo": "1112016",
+      "codigoRue": "1112016",
+      "sitioId": "CIALPA-S031",
+      "numeroSitio": 31,
+      "codigosSitio": [
+        "1112016"
+      ],
+      "codigosRueSitio": [
+        "1112016"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 11,
       "nombre": "ESCUELA BÁSICA N° 3529 NUESTRA SEÑORA DE LA ASUNCIÓN",
       "departamento": "CENTRAL",
       "distrito": "ÑEMBY",
@@ -353,6 +706,17 @@
     },
     {
       "codigo": "12158",
+      "codigoRue": "0012158",
+      "sitioId": "CIALPA-S032",
+      "numeroSitio": 32,
+      "codigosSitio": [
+        "12158"
+      ],
+      "codigosRueSitio": [
+        "0012158"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 30,
       "nombre": "COLEGIO NACIONAL DE LA CAPITAL GRAL. BERNARDINO CABALLERO",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -364,6 +728,17 @@
     },
     {
       "codigo": "12118",
+      "codigoRue": "0012118",
+      "sitioId": "CIALPA-S033",
+      "numeroSitio": 33,
+      "codigosSitio": [
+        "12118"
+      ],
+      "codigosRueSitio": [
+        "0012118"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 2,
       "nombre": "ESPACIO DE DESARROLLO INFANTIL 381 LIC. OBDULIA RIVAS DE ZAZZI CEBINFA",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -375,6 +750,17 @@
     },
     {
       "codigo": "15083",
+      "codigoRue": "0015083",
+      "sitioId": "CIALPA-S034",
+      "numeroSitio": 34,
+      "codigosSitio": [
+        "15083"
+      ],
+      "codigosRueSitio": [
+        "0015083"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 7,
       "nombre": "ESCUELA BÁSICA N° 409 REPÚBLICA FEDERAL DE ALEMANIA",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -386,6 +772,17 @@
     },
     {
       "codigo": "15068",
+      "codigoRue": "0015068",
+      "sitioId": "CIALPA-S035",
+      "numeroSitio": 35,
+      "codigosSitio": [
+        "15068"
+      ],
+      "codigosRueSitio": [
+        "0015068"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 12,
       "nombre": "ESCUELA BÁSICA N° 664 PRIMER PRESIDENTE CONSTITUCIONAL DEL PARAGUAY",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -397,6 +794,17 @@
     },
     {
       "codigo": "12047",
+      "codigoRue": "0012047",
+      "sitioId": "CIALPA-S036",
+      "numeroSitio": 36,
+      "codigosSitio": [
+        "12047"
+      ],
+      "codigosRueSitio": [
+        "0012047"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 4,
       "nombre": "ESCUELA BÁSICA N° 170 GENERAL MÁXIMO SANTOS",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -408,6 +816,17 @@
     },
     {
       "codigo": "15063",
+      "codigoRue": "0015063",
+      "sitioId": "CIALPA-S037",
+      "numeroSitio": 37,
+      "codigosSitio": [
+        "15063"
+      ],
+      "codigosRueSitio": [
+        "0015063"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 9,
       "nombre": "COLEGIO NACIONAL REPÚBLICA BOLIVARIANA DE VENEZUELA",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -419,6 +838,17 @@
     },
     {
       "codigo": "14115",
+      "codigoRue": "0014115",
+      "sitioId": "CIALPA-S038",
+      "numeroSitio": 38,
+      "codigosSitio": [
+        "14115"
+      ],
+      "codigosRueSitio": [
+        "0014115"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 11,
       "nombre": "ESCUELA BÁSICA N° 449 JUAN ALBERTO SAMANIEGO",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -430,6 +860,17 @@
     },
     {
       "codigo": "10011",
+      "codigoRue": "0010011",
+      "sitioId": "CIALPA-S039",
+      "numeroSitio": 39,
+      "codigosSitio": [
+        "10011"
+      ],
+      "codigosRueSitio": [
+        "0010011"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 35,
       "nombre": "COLEGIO EXPERIMENTAL PARAGUAY - BRASIL",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -441,6 +882,17 @@
     },
     {
       "codigo": "14112",
+      "codigoRue": "0014112",
+      "sitioId": "CIALPA-S040",
+      "numeroSitio": 40,
+      "codigosSitio": [
+        "14112"
+      ],
+      "codigosRueSitio": [
+        "0014112"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 26,
       "nombre": "ESCUELA BÁSICA N° 434 JUAN EUDORO CÁCERES",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -452,6 +904,17 @@
     },
     {
       "codigo": "14088",
+      "codigoRue": "0014088",
+      "sitioId": "CIALPA-S041",
+      "numeroSitio": 41,
+      "codigosSitio": [
+        "14088"
+      ],
+      "codigosRueSitio": [
+        "0014088"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 52,
       "nombre": "COLEGIO TÉCNICO NACIONAL",
       "departamento": "CAPITAL",
       "distrito": "ASUNCIÓN",
@@ -463,6 +926,17 @@
     },
     {
       "codigo": "1109202",
+      "codigoRue": "1109202",
+      "sitioId": "CIALPA-S042",
+      "numeroSitio": 42,
+      "codigosSitio": [
+        "1109202"
+      ],
+      "codigosRueSitio": [
+        "1109202"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 14,
       "nombre": "COLEGIO NACIONAL JULIO CORREA",
       "departamento": "CENTRAL",
       "distrito": "LUQUE",
@@ -474,6 +948,17 @@
     },
     {
       "codigo": "1118002",
+      "codigoRue": "1118002",
+      "sitioId": "CIALPA-S043",
+      "numeroSitio": 43,
+      "codigosSitio": [
+        "1118002"
+      ],
+      "codigosRueSitio": [
+        "1118002"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 74,
       "nombre": "COLEGIO NACIONAL MIGUEL ÁNGEL TORALES",
       "departamento": "CENTRAL",
       "distrito": "YPANÉ",
@@ -485,6 +970,17 @@
     },
     {
       "codigo": "1109043",
+      "codigoRue": "1109043",
+      "sitioId": "CIALPA-S044",
+      "numeroSitio": 44,
+      "codigosSitio": [
+        "1109043"
+      ],
+      "codigosRueSitio": [
+        "1109043"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 68,
       "nombre": "COLEGIO NACIONAL DE E.M.D. GRAL. JOSÉ ELIZARDO AQUINO",
       "departamento": "CENTRAL",
       "distrito": "LUQUE",
@@ -496,6 +992,17 @@
     },
     {
       "codigo": "1110019",
+      "codigoRue": "1110019",
+      "sitioId": "CIALPA-S045",
+      "numeroSitio": 45,
+      "codigosSitio": [
+        "1110019"
+      ],
+      "codigosRueSitio": [
+        "1110019"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 15,
       "nombre": "ESCUELA BÁSICA N° 4726 NUESTRA SEÑORA VIRGEN DEL CARMEN",
       "departamento": "CENTRAL",
       "distrito": "MARIANO ROQUE ALONSO",
@@ -507,6 +1014,17 @@
     },
     {
       "codigo": "1109026",
+      "codigoRue": "1109026",
+      "sitioId": "CIALPA-S046",
+      "numeroSitio": 46,
+      "codigosSitio": [
+        "1109026"
+      ],
+      "codigosRueSitio": [
+        "1109026"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 12,
       "nombre": "ESCUELA BÁSICA N° 4551 MAURICIO CARDOZO OCAMPO",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -518,6 +1036,17 @@
     },
     {
       "codigo": "1114088",
+      "codigoRue": "1114088",
+      "sitioId": "CIALPA-S047",
+      "numeroSitio": 47,
+      "codigosSitio": [
+        "1114088"
+      ],
+      "codigosRueSitio": [
+        "1114088"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 8,
       "nombre": "ESCUELA BÁSICA N° 5630 NUESTRA SEÑORA SANTA MARÍA",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -529,6 +1058,17 @@
     },
     {
       "codigo": "1110066",
+      "codigoRue": "1110066",
+      "sitioId": "CIALPA-S048",
+      "numeroSitio": 48,
+      "codigosSitio": [
+        "1110066"
+      ],
+      "codigosRueSitio": [
+        "1110066"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 14,
       "nombre": "ESCUELA BÁSICA N° 7090 CABO 1° LEONARDO GALEANO",
       "departamento": "CENTRAL",
       "distrito": "MARIANO ROQUE ALONSO",
@@ -540,6 +1080,17 @@
     },
     {
       "codigo": "1102083",
+      "codigoRue": "1102083",
+      "sitioId": "CIALPA-S049",
+      "numeroSitio": 49,
+      "codigosSitio": [
+        "1102083"
+      ],
+      "codigosRueSitio": [
+        "1102083"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 7,
       "nombre": "ESCUELA BÁSICA N° 7631 VIRGEN DE LA PAZ",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -551,6 +1102,17 @@
     },
     {
       "codigo": "1102029",
+      "codigoRue": "1102029",
+      "sitioId": "CIALPA-S050",
+      "numeroSitio": 50,
+      "codigosSitio": [
+        "1102029"
+      ],
+      "codigosRueSitio": [
+        "1102029"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 9,
       "nombre": "ESCUELA BÁSICA N° 2857 CLUB DE LEONES DE CAPIATÁ",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -562,6 +1124,19 @@
     },
     {
       "codigo": "1108034",
+      "codigoRue": "1108034",
+      "sitioId": "CIALPA-S051",
+      "numeroSitio": 51,
+      "codigosSitio": [
+        "1108034",
+        "1108042"
+      ],
+      "codigosRueSitio": [
+        "1108034",
+        "1108042"
+      ],
+      "sedeCompartida": true,
+      "aulasEstimadasSitio": 11,
       "nombre": "ESCUELA BÁSICA N° 5570 SAN JUAN BOSCO",
       "departamento": "CENTRAL",
       "distrito": "LIMPIO",
@@ -573,6 +1148,17 @@
     },
     {
       "codigo": "1115031",
+      "codigoRue": "1115031",
+      "sitioId": "CIALPA-S052",
+      "numeroSitio": 52,
+      "codigosSitio": [
+        "1115031"
+      ],
+      "codigosRueSitio": [
+        "1115031"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 9,
       "nombre": "ESCUELA BÁSICA N° 3839 ESTADO DE QATAR",
       "departamento": "CENTRAL",
       "distrito": "VILLA ELISA",
@@ -584,6 +1170,17 @@
     },
     {
       "codigo": "1102081",
+      "codigoRue": "1102081",
+      "sitioId": "CIALPA-S053",
+      "numeroSitio": 53,
+      "codigosSitio": [
+        "1102081"
+      ],
+      "codigosRueSitio": [
+        "1102081"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 10,
       "nombre": "ESCUELA BÁSICA N° 6032 MUNICIPAL SAN RAMÓN",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -595,6 +1192,17 @@
     },
     {
       "codigo": "1107100",
+      "codigoRue": "1107100",
+      "sitioId": "CIALPA-S054",
+      "numeroSitio": 54,
+      "codigosSitio": [
+        "1107100"
+      ],
+      "codigosRueSitio": [
+        "1107100"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 5,
       "nombre": "ESCUELA BÁSICA N° 7036 LA ARBOLEDA",
       "departamento": "CENTRAL",
       "distrito": "LAMBARÉ",
@@ -606,6 +1214,17 @@
     },
     {
       "codigo": "1108027",
+      "codigoRue": "1108027",
+      "sitioId": "CIALPA-S055",
+      "numeroSitio": 55,
+      "codigosSitio": [
+        "1108027"
+      ],
+      "codigosRueSitio": [
+        "1108027"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 13,
       "nombre": "ESCUELA BÁSICA N° 3681 MONTAÑA ALTA",
       "departamento": "CENTRAL",
       "distrito": "LIMPIO",
@@ -617,6 +1236,17 @@
     },
     {
       "codigo": "1114047",
+      "codigoRue": "1114047",
+      "sitioId": "CIALPA-S056",
+      "numeroSitio": 56,
+      "codigosSitio": [
+        "1114047"
+      ],
+      "codigosRueSitio": [
+        "1114047"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 21,
       "nombre": "ESCUELA BÁSICA N° 599 GENERAL DE DIVISIÓN FRANCISCO CABALLERO ALVAREZ",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -628,6 +1258,17 @@
     },
     {
       "codigo": "1102005",
+      "codigoRue": "1102005",
+      "sitioId": "CIALPA-S057",
+      "numeroSitio": 57,
+      "codigosSitio": [
+        "1102005"
+      ],
+      "codigosRueSitio": [
+        "1102005"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 57,
       "nombre": "ESCUELA BÁSICA N° 603 PDTE. JOHN F. KENNEDY",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -639,6 +1280,17 @@
     },
     {
       "codigo": "1110024",
+      "codigoRue": "1110024",
+      "sitioId": "CIALPA-S058",
+      "numeroSitio": 58,
+      "codigosSitio": [
+        "1110024"
+      ],
+      "codigosRueSitio": [
+        "1110024"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 20,
       "nombre": "ESCUELA BÁSICA N° 4744 PROFESORA OTILIA FERNÁNDEZ DE ACOSTA",
       "departamento": "CENTRAL",
       "distrito": "MARIANO ROQUE ALONSO",
@@ -650,6 +1302,17 @@
     },
     {
       "codigo": "1109077",
+      "codigoRue": "1109077",
+      "sitioId": "CIALPA-S059",
+      "numeroSitio": 59,
+      "codigosSitio": [
+        "1109077"
+      ],
+      "codigosRueSitio": [
+        "1109077"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 19,
       "nombre": "ESCUELA BÁSICA N° 3778 LOMA MERLO",
       "departamento": "CENTRAL",
       "distrito": "LUQUE",
@@ -661,6 +1324,17 @@
     },
     {
       "codigo": "1115012",
+      "codigoRue": "1115012",
+      "sitioId": "CIALPA-S060",
+      "numeroSitio": 60,
+      "codigosSitio": [
+        "1115012"
+      ],
+      "codigosRueSitio": [
+        "1115012"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 23,
       "nombre": "ESCUELA BÁSICA N° 3537 SAN JOSÉ",
       "departamento": "CENTRAL",
       "distrito": "VILLA ELISA",
@@ -672,6 +1346,17 @@
     },
     {
       "codigo": "1109073",
+      "codigoRue": "1109073",
+      "sitioId": "CIALPA-S061",
+      "numeroSitio": 61,
+      "codigosSitio": [
+        "1109073"
+      ],
+      "codigosRueSitio": [
+        "1109073"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 19,
       "nombre": "ESCUELA BÁSICA N° 3785 AMISTAD",
       "departamento": "CENTRAL",
       "distrito": "LUQUE",
@@ -683,6 +1368,17 @@
     },
     {
       "codigo": "1105015",
+      "codigoRue": "1105015",
+      "sitioId": "CIALPA-S062",
+      "numeroSitio": 62,
+      "codigosSitio": [
+        "1105015"
+      ],
+      "codigosRueSitio": [
+        "1105015"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 6,
       "nombre": "ESCUELA BÁSICA N° 882 DON CORNELIO GAONA",
       "departamento": "CENTRAL",
       "distrito": "ITÁ",
@@ -694,6 +1390,17 @@
     },
     {
       "codigo": "1101012",
+      "codigoRue": "1101012",
+      "sitioId": "CIALPA-S063",
+      "numeroSitio": 63,
+      "codigosSitio": [
+        "1101012"
+      ],
+      "codigosRueSitio": [
+        "1101012"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 7,
       "nombre": "ESCUELA BÁSICA N° 2956 SAN MIGUEL ARCANGEL",
       "departamento": "CENTRAL",
       "distrito": "AREGUÁ",
@@ -705,6 +1412,17 @@
     },
     {
       "codigo": "1104007",
+      "codigoRue": "1104007",
+      "sitioId": "CIALPA-S064",
+      "numeroSitio": 64,
+      "codigosSitio": [
+        "1104007"
+      ],
+      "codigosRueSitio": [
+        "1104007"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 6,
       "nombre": "ESCUELA BÁSICA N° 3519 ALFEO ZANOTTI",
       "departamento": "CENTRAL",
       "distrito": "GUARAMBARÉ",
@@ -716,6 +1434,17 @@
     },
     {
       "codigo": "1106060",
+      "codigoRue": "1106060",
+      "sitioId": "CIALPA-S065",
+      "numeroSitio": 65,
+      "codigosSitio": [
+        "1106060"
+      ],
+      "codigosRueSitio": [
+        "1106060"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 6,
       "nombre": "ESCUELA BÁSICA N° 6393 URUNDE'Y",
       "departamento": "CENTRAL",
       "distrito": "ITAUGUÁ",
@@ -727,6 +1456,17 @@
     },
     {
       "codigo": "1101010",
+      "codigoRue": "1101010",
+      "sitioId": "CIALPA-S066",
+      "numeroSitio": 66,
+      "codigosSitio": [
+        "1101010"
+      ],
+      "codigosRueSitio": [
+        "1101010"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 7,
       "nombre": "ESCUELA BÁSICA N° 3883 MARÍA AUXILIADORA",
       "departamento": "CENTRAL",
       "distrito": "AREGUÁ",
@@ -738,6 +1478,17 @@
     },
     {
       "codigo": "1101022",
+      "codigoRue": "1101022",
+      "sitioId": "CIALPA-S067",
+      "numeroSitio": 67,
+      "codigosSitio": [
+        "1101022"
+      ],
+      "codigosRueSitio": [
+        "1101022"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 21,
       "nombre": "ESCUELA BÁSICA N° 2128 SEÑOR FRANCISCO MEDINA ALFONZO",
       "departamento": "CENTRAL",
       "distrito": "AREGUÁ",
@@ -749,6 +1500,17 @@
     },
     {
       "codigo": "1119009",
+      "codigoRue": "1119009",
+      "sitioId": "CIALPA-S068",
+      "numeroSitio": 68,
+      "codigosSitio": [
+        "1119009"
+      ],
+      "codigosRueSitio": [
+        "1119009"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 33,
       "nombre": "ESCUELA BÁSICA N° 883 CORONEL FELIPE TOLEDO",
       "departamento": "CENTRAL",
       "distrito": "JULIÁN AUGUSTO SALDÍVAR",
@@ -760,6 +1522,17 @@
     },
     {
       "codigo": "1117007",
+      "codigoRue": "1117007",
+      "sitioId": "CIALPA-S069",
+      "numeroSitio": 69,
+      "codigosSitio": [
+        "1117007"
+      ],
+      "codigosRueSitio": [
+        "1117007"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 2,
       "nombre": "ESCUELA BÁSICA N° 2133 NUESTRA SEÑORA DEL ROSARIO",
       "departamento": "CENTRAL",
       "distrito": "YPACARAÍ",
@@ -771,6 +1544,17 @@
     },
     {
       "codigo": "1114081",
+      "codigoRue": "1114081",
+      "sitioId": "CIALPA-S070",
+      "numeroSitio": 70,
+      "codigosSitio": [
+        "1114081"
+      ],
+      "codigosRueSitio": [
+        "1114081"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 14,
       "nombre": "ESCUELA BÁSICA N° 4209 SAN RAMON",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -782,6 +1566,17 @@
     },
     {
       "codigo": "1114031",
+      "codigoRue": "1114031",
+      "sitioId": "CIALPA-S071",
+      "numeroSitio": 71,
+      "codigosSitio": [
+        "1114031"
+      ],
+      "codigosRueSitio": [
+        "1114031"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 13,
       "nombre": "ESCUELA BÁSICA N° 264 CLOTILDE EMILIA PAREDES",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -793,6 +1588,17 @@
     },
     {
       "codigo": "1103044",
+      "codigoRue": "1103044",
+      "sitioId": "CIALPA-S072",
+      "numeroSitio": 72,
+      "codigosSitio": [
+        "1103044"
+      ],
+      "codigosRueSitio": [
+        "1103044"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 7,
       "nombre": "ESCUELA BÁSICA N° 665 FORTÍN NANAWA",
       "departamento": "CENTRAL",
       "distrito": "FERNANDO DE LA MORA",
@@ -804,6 +1610,17 @@
     },
     {
       "codigo": "1102062",
+      "codigoRue": "1102062",
+      "sitioId": "CIALPA-S073",
+      "numeroSitio": 73,
+      "codigosSitio": [
+        "1102062"
+      ],
+      "codigosRueSitio": [
+        "1102062"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 12,
       "nombre": "ESCUELA BÁSICA N° 1944 PUERTA DEL SOL",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -815,6 +1632,17 @@
     },
     {
       "codigo": "1114002",
+      "codigoRue": "1114002",
+      "sitioId": "CIALPA-S074",
+      "numeroSitio": 74,
+      "codigosSitio": [
+        "1114002"
+      ],
+      "codigosRueSitio": [
+        "1114002"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 8,
       "nombre": "ESCUELA BÁSICA N° 4211 PROFESORA TACIANA VILLASANTI DE VILLALBA",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -826,6 +1654,17 @@
     },
     {
       "codigo": "1114013",
+      "codigoRue": "1114013",
+      "sitioId": "CIALPA-S075",
+      "numeroSitio": 75,
+      "codigosSitio": [
+        "1114013"
+      ],
+      "codigosRueSitio": [
+        "1114013"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 15,
       "nombre": "ESCUELA BÁSICA N° 4172 MARÍA ANTONIA LICO DE GALATI",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -837,6 +1676,17 @@
     },
     {
       "codigo": "1102047",
+      "codigoRue": "1102047",
+      "sitioId": "CIALPA-S076",
+      "numeroSitio": 76,
+      "codigosSitio": [
+        "1102047"
+      ],
+      "codigosRueSitio": [
+        "1102047"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 36,
       "nombre": "ESCUELA BÁSICA N° 3699 SAN AGUSTÍN",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -848,6 +1698,17 @@
     },
     {
       "codigo": "1114009",
+      "codigoRue": "1114009",
+      "sitioId": "CIALPA-S077",
+      "numeroSitio": 77,
+      "codigosSitio": [
+        "1114009"
+      ],
+      "codigosRueSitio": [
+        "1114009"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 17,
       "nombre": "ESCUELA BÁSICA N° 251 JOSÉ DOLORES GONZÁLEZ",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -859,6 +1720,17 @@
     },
     {
       "codigo": "1107006",
+      "codigoRue": "1107006",
+      "sitioId": "CIALPA-S078",
+      "numeroSitio": 78,
+      "codigosSitio": [
+        "1107006"
+      ],
+      "codigosRueSitio": [
+        "1107006"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 30,
       "nombre": "ESCUELA BÁSICA N° 471 SANTA LUCÍA",
       "departamento": "CENTRAL",
       "distrito": "LAMBARÉ",
@@ -870,6 +1742,17 @@
     },
     {
       "codigo": "1102009",
+      "codigoRue": "1102009",
+      "sitioId": "CIALPA-S079",
+      "numeroSitio": 79,
+      "codigosSitio": [
+        "1102009"
+      ],
+      "codigosRueSitio": [
+        "1102009"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 27,
       "nombre": "ESCUELA BÁSICA N° 3059 SANTA ROSA DE LIMA",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -881,6 +1764,17 @@
     },
     {
       "codigo": "1114037",
+      "codigoRue": "1114037",
+      "sitioId": "CIALPA-S080",
+      "numeroSitio": 80,
+      "codigosSitio": [
+        "1114037"
+      ],
+      "codigosRueSitio": [
+        "1114037"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 22,
       "nombre": "ESCUELA BÁSICA N° 2391 CHOFERES DEL CHACO",
       "departamento": "CENTRAL",
       "distrito": "SAN LORENZO",
@@ -892,6 +1786,17 @@
     },
     {
       "codigo": "1107068",
+      "codigoRue": "1107068",
+      "sitioId": "CIALPA-S081",
+      "numeroSitio": 81,
+      "codigosSitio": [
+        "1107068"
+      ],
+      "codigosRueSitio": [
+        "1107068"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 19,
       "nombre": "ESCUELA BÁSICA N° 8230 AVA MBA'E",
       "departamento": "CENTRAL",
       "distrito": "LAMBARÉ",
@@ -903,6 +1808,17 @@
     },
     {
       "codigo": "1109069",
+      "codigoRue": "1109069",
+      "sitioId": "CIALPA-S082",
+      "numeroSitio": 82,
+      "codigosSitio": [
+        "1109069"
+      ],
+      "codigosRueSitio": [
+        "1109069"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 29,
       "nombre": "ESCUELA BÁSICA N° 860 MAESTRO ANTONIO MARCOS SILVA",
       "departamento": "CENTRAL",
       "distrito": "LUQUE",
@@ -914,6 +1830,17 @@
     },
     {
       "codigo": "1102021",
+      "codigoRue": "1102021",
+      "sitioId": "CIALPA-S083",
+      "numeroSitio": 83,
+      "codigosSitio": [
+        "1102021"
+      ],
+      "codigosRueSitio": [
+        "1102021"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 43,
       "nombre": "ESCUELA BÁSICA N° 1943 CARLOS ANTONIO RACHIT",
       "departamento": "CENTRAL",
       "distrito": "CAPIATÁ",
@@ -925,6 +1852,17 @@
     },
     {
       "codigo": "1105017",
+      "codigoRue": "1105017",
+      "sitioId": "CIALPA-S084",
+      "numeroSitio": 84,
+      "codigosSitio": [
+        "1105017"
+      ],
+      "codigosRueSitio": [
+        "1105017"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 12,
       "nombre": "ESCUELA BÁSICA N° 881 SOLDADOS DEL CHACO",
       "departamento": "CENTRAL",
       "distrito": "ITÁ",
@@ -936,6 +1874,17 @@
     },
     {
       "codigo": "1111013",
+      "codigoRue": "1111013",
+      "sitioId": "CIALPA-S085",
+      "numeroSitio": 85,
+      "codigosSitio": [
+        "1111013"
+      ],
+      "codigosRueSitio": [
+        "1111013"
+      ],
+      "sedeCompartida": false,
+      "aulasEstimadasSitio": 2,
       "nombre": "CENTRO EDUCATIVO DEPARTAMENTAL MUNICIPAL NUEVA ITALIA",
       "departamento": "CENTRAL",
       "distrito": "NUEVA ITALIA",
@@ -947,6 +1896,19 @@
     },
     {
       "codigo": "1108042",
+      "codigoRue": "1108042",
+      "sitioId": "CIALPA-S051",
+      "numeroSitio": 51,
+      "codigosSitio": [
+        "1108034",
+        "1108042"
+      ],
+      "codigosRueSitio": [
+        "1108034",
+        "1108042"
+      ],
+      "sedeCompartida": true,
+      "aulasEstimadasSitio": 11,
       "nombre": "COLEGIO NACIONAL SAN JUAN BOSCO",
       "departamento": "CENTRAL",
       "distrito": "LIMPIO",

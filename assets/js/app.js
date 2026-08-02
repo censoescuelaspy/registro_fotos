@@ -15,6 +15,17 @@ import {
   schoolStatus
 } from './operations.js';
 import { contingencyForecast, minutesLabel } from './performance.js';
+import { enhanceContextHelp, initializeContextHelp } from './help.js';
+import {
+  buildRueCompatibilityRows,
+  canonicalAppSchoolCode,
+  findSchoolByCode,
+  normalizeRueSchoolCode,
+  rueCompatibilityCsv,
+  rueCompatibilitySummary,
+  rueSectionForSpace,
+  rueSpaceKey
+} from './rue.js';
 
 const app = document.querySelector('#app');
 const toastRegion = document.querySelector('#toast-region');
@@ -24,7 +35,8 @@ const operationsViews = new Set(['admin', 'surveyors', 'logistics', 'requests'])
 const savedPlanningSettings = loadJson('cialpa-fotos-planning-settings-v1') || {};
 const INCIDENT_REPORT_TEMPLATE = [
   'Codigo operativo / cedula (sin PIN):',
-  'Codigo MEC:',
+  'Codigo RUE (7 digitos):',
+  'Sitio fisico CIALPA:',
   'Registro B/P/E/H:',
   'Fecha y hora:',
   'Accion realizada:',
@@ -59,6 +71,7 @@ const state = {
   logisticsDraft: {},
   logisticsInitialized: false,
   logisticsSaving: false,
+  rueExporting: false,
   planningSettings: {
     baseMinutes: Number(savedPlanningSettings.baseMinutes || 45),
     hoursPerDay: Number(savedPlanningSettings.hoursPerDay || 6),
@@ -70,6 +83,7 @@ const state = {
 };
 
 api.setSession(state.session);
+initializeContextHelp();
 
 function loadJson(key) {
   try {
@@ -101,7 +115,7 @@ function refreshIcons() {
 function toast(message, tone = 'info', timeout = 4500) {
   const element = document.createElement('div');
   element.className = `toast toast-${tone}`;
-  element.innerHTML = `${icon(tone === 'error' ? 'circle-alert' : tone === 'success' ? 'circle-check' : 'info')}<span>${escapeHtml(message)}</span>`;
+  element.innerHTML = `${icon(tone === 'error' ? 'circle-alert' : tone === 'success' ? 'circle-check' : tone === 'warning' ? 'triangle-alert' : 'info')}<span>${escapeHtml(message)}</span>`;
   toastRegion.append(element);
   refreshIcons();
   setTimeout(() => element.remove(), timeout);
@@ -154,16 +168,16 @@ async function refreshLocalState() {
 async function loadBootstrap(allowCache = false) {
   const cached = loadJson('cialpa-fotos-bootstrap-cache-v1');
   if (allowCache && !navigator.onLine && cached) {
-    state.bootstrap = cached;
+    state.bootstrap = normalizeBootstrapSchoolCodes(cached);
     toast('Sin conexion: se muestran las asignaciones guardadas en este celular.', 'info');
     return;
   }
   try {
-    state.bootstrap = await api.bootstrap();
+    state.bootstrap = normalizeBootstrapSchoolCodes(await api.bootstrap());
     saveJson('cialpa-fotos-bootstrap-cache-v1', state.bootstrap);
   } catch (error) {
     if (allowCache && cached) {
-      state.bootstrap = cached;
+      state.bootstrap = normalizeBootstrapSchoolCodes(cached);
       toast('Sin conexion: se muestran las asignaciones guardadas en este celular.', 'info');
       return;
     }
@@ -185,14 +199,15 @@ async function loadRemoteRecords(allowCache = false) {
     state.remote = cached?.codigoCensista === user.codigoCensista
       ? cached.data || { records: [], photos: [] }
       : { records: [], photos: [] };
+    state.remote = normalizeRemoteSchoolCodes(state.remote);
     return;
   }
   try {
-    state.remote = await api.listRecords({ codigoCensista: user.codigoCensista });
+    state.remote = normalizeRemoteSchoolCodes(await api.listRecords({ codigoCensista: user.codigoCensista }));
     saveJson(APP_CONFIG.recordsCacheKey, { codigoCensista: user.codigoCensista, data: state.remote });
   } catch (error) {
     if (allowCache && cached?.codigoCensista === user.codigoCensista) {
-      state.remote = cached.data || { records: [], photos: [] };
+      state.remote = normalizeRemoteSchoolCodes(cached.data || { records: [], photos: [] });
       return;
     }
     if (allowCache) {
@@ -214,6 +229,7 @@ function render() {
     app.innerHTML = renderShell();
     mountView();
   }
+  enhanceContextHelp(app);
   refreshIcons();
 }
 
@@ -375,7 +391,7 @@ function renderCurrentView() {
 function availableSchools() {
   if (!state.bootstrap) return [];
   if (state.bootstrap.showAllSchools) return state.catalog;
-  const assigned = new Set(state.bootstrap.assignedCodes || []);
+  const assigned = new Set((state.bootstrap.assignedCodes || []).map(canonicalSchoolCode));
   return state.catalog.filter((school) => assigned.has(school.codigo));
 }
 
@@ -383,7 +399,7 @@ function filteredSchools() {
   const search = state.filters.search.trim().toLocaleLowerCase('es');
   const progress = state.bootstrap?.progress || {};
   let schools = availableSchools().filter((school) => {
-    const haystack = `${school.codigo} ${school.nombre} ${school.distrito} ${school.localidad}`.toLocaleLowerCase('es');
+    const haystack = `${school.codigo} ${school.codigoRue || ''} ${school.sitioId || ''} ${(school.codigosRueSitio || []).join(' ')} ${school.nombre} ${school.distrito} ${school.localidad}`.toLocaleLowerCase('es');
     const status = progress[school.codigo]?.estado || 'PENDIENTE';
     return (!search || haystack.includes(search))
       && (!state.filters.department || school.departamento === state.filters.department)
@@ -407,7 +423,7 @@ function renderSchools() {
       <button class="btn btn-secondary" data-action="locate">${icon('locate-fixed')} Mi ubicacion</button>
     </div>
     <div class="filter-bar">
-      <label class="search-field">${icon('search')}<input data-filter="search" value="${escapeHtml(state.filters.search)}" placeholder="Codigo, escuela, distrito..."></label>
+      <label class="search-field">${icon('search')}<input data-filter="search" value="${escapeHtml(state.filters.search)}" placeholder="Codigo RUE o interno, escuela, distrito..."></label>
       <select data-filter="department" aria-label="Departamento">
         <option value="">Todos los departamentos</option>
         ${departments.map((department) => `<option ${state.filters.department === department ? 'selected' : ''}>${escapeHtml(department)}</option>`).join('')}
@@ -431,11 +447,13 @@ function renderSchools() {
 
 function renderSelectedSchool(school) {
   const progress = state.bootstrap?.progress?.[school.codigo] || {};
+  const rueCode = school.codigoRue || normalizeRueSchoolCode(school.codigo);
   return `<article class="selected-school">
     <button class="icon-btn close-selected" data-action="clear-school" title="Cerrar detalle">${icon('x')}</button>
     <span class="status-pill status-${(progress.estado || 'PENDIENTE').toLowerCase()}">${statusLabel(progress.estado || 'PENDIENTE')}</span>
     <h2>${escapeHtml(school.nombre)}</h2>
-    <p><strong>${escapeHtml(school.codigo)}</strong> · ${escapeHtml(school.distrito)} · ${escapeHtml(school.localidad)}</p>
+    <p><strong>RUE ${escapeHtml(rueCode)}</strong> · Interno ${escapeHtml(school.codigo)} · ${escapeHtml(school.sitioId || 'Sitio sin conciliar')} · ${escapeHtml(school.distrito)} · ${escapeHtml(school.localidad)}</p>
+    ${school.sedeCompartida ? `<p class="shared-site-note">${icon('building-2', 15)} Sede compartida por ${escapeHtml((school.codigosRueSitio || []).join(' y '))}</p>` : ''}
     <div class="selected-school-stats"><span>${progress.registros || 0} registros</span><span>${progress.fotos || 0} fotos</span></div>
     <div class="button-row">
       <button class="btn btn-primary" data-action="start-record" data-school="${school.codigo}">${icon('camera')} Registrar</button>
@@ -449,7 +467,7 @@ function renderSchoolRow(school) {
   const active = state.selectedSchoolCode === school.codigo;
   return `<button class="school-row ${active ? 'is-active' : ''}" data-action="select-school" data-school="${school.codigo}">
     <span class="school-status-dot status-${(progress.estado || 'PENDIENTE').toLowerCase()}"></span>
-    <span class="school-row-main"><strong>${escapeHtml(school.nombre)}</strong><small>${escapeHtml(school.codigo)} · ${escapeHtml(school.distrito)}</small></span>
+    <span class="school-row-main"><strong>${escapeHtml(school.nombre)}</strong><small>RUE ${escapeHtml(school.codigoRue || normalizeRueSchoolCode(school.codigo))} · Interno ${escapeHtml(school.codigo)} · ${escapeHtml(school.sitioId || '')} · ${escapeHtml(school.distrito)}</small></span>
     ${Number.isFinite(school.distanceKm) ? `<span class="distance">${school.distanceKm < 1 ? `${Math.round(school.distanceKm * 1000)} m` : `${school.distanceKm.toFixed(1)} km`}</span>` : ''}
     ${icon('chevron-right', 16)}
   </button>`;
@@ -461,9 +479,12 @@ function renderRegister() {
   state.activeDraft = draft;
   const school = schoolByCode(draft.codigoEscuela);
   const recordId = calculateRecordId(draft);
+  const recordHeading = draft.sourceRecordKey
+    ? 'Editar registro'
+    : (draft.draftId && state.drafts.some((item) => item.draftId === draft.draftId) ? 'Editar borrador' : 'Nuevo registro');
   return `<section class="view view-register">
     <div class="view-heading">
-      <div><p class="eyebrow">Registro progresivo</p><h1>${draft.sourceRecordKey || (draft.draftId && state.drafts.some((item) => item.draftId === draft.draftId)) ? 'Continuar registro' : 'Nuevo registro'}</h1><p>Identificador: <strong class="record-code">${escapeHtml(recordId || 'Complete los numeros requeridos')}</strong> · Tiempo transcurrido: <strong>${elapsedMinutesLabel(draft.startedAt)}</strong></p></div>
+      <div><p class="eyebrow">Registro progresivo</p><h1>${recordHeading}</h1><p>Identificador: <strong class="record-code">${escapeHtml(recordId || 'Complete los numeros requeridos')}</strong> · Tiempo transcurrido: <strong>${elapsedMinutesLabel(draft.startedAt)}</strong></p></div>
       <button class="btn btn-secondary" data-action="save-draft">${icon('save')} Guardar borrador</button>
     </div>
     <form id="record-form" data-form="record" class="record-layout" novalidate>
@@ -472,7 +493,7 @@ function renderRegister() {
         <div class="form-grid two-cols">
           <label class="full-row">Escuela
             <select name="codigoEscuela" required>
-              ${schools.map((item) => `<option value="${item.codigo}" ${item.codigo === draft.codigoEscuela ? 'selected' : ''}>${escapeHtml(item.codigo)} · ${escapeHtml(item.nombre)}</option>`).join('')}
+              ${schools.map((item) => `<option value="${item.codigo}" ${item.codigo === draft.codigoEscuela ? 'selected' : ''}>RUE ${escapeHtml(item.codigoRue || normalizeRueSchoolCode(item.codigo))} · Interno ${escapeHtml(item.codigo)} · ${escapeHtml(item.nombre)}</option>`).join('')}
             </select>
           </label>
           <label>Formulario<input name="numeroFormulario" value="${escapeHtml(draft.numeroFormulario)}" inputmode="numeric" pattern="[0-9]+" required maxlength="4"></label>
@@ -484,7 +505,7 @@ function renderRegister() {
             <select name="tipoEspacio" required>${spaceOptions(draft.tipoEspacio)}</select>
           </label>
         </div>
-        ${school ? `<div class="school-context">${icon('school')}<span><strong>${escapeHtml(school.nombre)}</strong><small>${escapeHtml(school.distrito)} · ${escapeHtml(school.localidad)}</small></span></div>` : ''}
+        ${school ? `<div class="school-context">${icon('school')}<span><strong>${escapeHtml(school.nombre)}</strong><small>RUE ${escapeHtml(school.codigoRue || normalizeRueSchoolCode(school.codigo))} · Interno ${escapeHtml(school.codigo)} · ${escapeHtml(school.sitioId || '')} · ${escapeHtml(school.distrito)} · ${escapeHtml(school.localidad)}</small></span></div>` : ''}
       </section>
       <section class="form-panel photo-panel">
         <div class="panel-heading"><span class="step-number">2</span><div><h2>Fotografias</h2><p>Cada imagen conservara el identificador del registro.</p></div><span class="count-badge">${draft.photos.length}</span></div>
@@ -538,10 +559,11 @@ function renderRegister() {
 }
 
 function newDraft(code = '') {
+  const schoolCode = canonicalSchoolCode(code);
   return {
     draftId: crypto.randomUUID(),
     idempotencyKey: crypto.randomUUID(),
-    codigoEscuela: code,
+    codigoEscuela: schoolCode,
     numeroFormulario: '1',
     numeroHoja: '1',
     bloque: '1',
@@ -611,7 +633,7 @@ function renderPending() {
     ${renderMyPerformance(state.bootstrap?.performance)}
     <section class="content-section next-school-section">
       <div class="section-heading"><div><h2>Proxima escuela</h2><p>${state.location ? 'Sugerida por cercania a su ubicacion actual.' : 'Sugerida segun el orden de la muestra.'}</p></div></div>
-      ${nextSchool ? `<article class="next-school-card"><div class="list-card-icon">${icon('school')}</div><div><span class="status-pill status-${schoolStatus(progress, nextSchool.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, nextSchool.codigo))}</span><h3>${escapeHtml(nextSchool.nombre)}</h3><p><strong>${escapeHtml(nextSchool.codigo)}</strong> · ${escapeHtml(nextSchool.distrito)} · ${escapeHtml(nextSchool.localidad)}${Number.isFinite(nextSchool.distanceKm) ? ` · ${nextSchool.distanceKm < 1 ? `${Math.round(nextSchool.distanceKm * 1000)} m` : `${nextSchool.distanceKm.toFixed(1)} km`}` : ''}</p></div><div class="button-row"><button class="btn btn-primary" data-action="start-record" data-school="${nextSchool.codigo}">${icon('camera')} Registrar</button><button class="btn btn-secondary" data-action="show-school" data-school="${nextSchool.codigo}">${icon('map')} Ver en mapa</button><a class="icon-btn" href="https://www.google.com/maps/dir/?api=1&destination=${nextSchool.latitud},${nextSchool.longitud}" target="_blank" rel="noopener" title="Abrir ruta en Google Maps" aria-label="Abrir ruta en Google Maps">${icon('navigation')}</a></div></article>` : renderEmpty('badge-check', 'Jornada completada.', 'No quedan escuelas pendientes en sus asignaciones.')}
+      ${nextSchool ? `<article class="next-school-card"><div class="list-card-icon">${icon('school')}</div><div><span class="status-pill status-${schoolStatus(progress, nextSchool.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, nextSchool.codigo))}</span><h3>${escapeHtml(nextSchool.nombre)}</h3><p><strong>RUE ${escapeHtml(nextSchool.codigoRue || normalizeRueSchoolCode(nextSchool.codigo))}</strong> · Interno ${escapeHtml(nextSchool.codigo)} · ${escapeHtml(nextSchool.distrito)} · ${escapeHtml(nextSchool.localidad)}${Number.isFinite(nextSchool.distanceKm) ? ` · ${nextSchool.distanceKm < 1 ? `${Math.round(nextSchool.distanceKm * 1000)} m` : `${nextSchool.distanceKm.toFixed(1)} km`}` : ''}</p></div><div class="button-row"><button class="btn btn-primary" data-action="start-record" data-school="${nextSchool.codigo}">${icon('camera')} Registrar</button><button class="btn btn-secondary" data-action="show-school" data-school="${nextSchool.codigo}">${icon('map')} Ver en mapa</button><a class="icon-btn" href="https://www.google.com/maps/dir/?api=1&destination=${nextSchool.latitud},${nextSchool.longitud}" target="_blank" rel="noopener" title="Abrir ruta en Google Maps" aria-label="Abrir ruta en Google Maps">${icon('navigation')}</a></div></article>` : renderEmpty('badge-check', 'Jornada completada.', 'No quedan escuelas pendientes en sus asignaciones.')}
     </section>
     <section class="content-section">
       <div class="section-heading"><div><h2>Borradores locales</h2><p>Registros que todavia pueden modificarse.</p></div></div>
@@ -641,8 +663,12 @@ function renderQueueRow(item) {
 
 function renderSyncedRecordRow(record) {
   const school = schoolByCode(record.codigoEscuela);
-  const own = record.codigoCensista === (state.bootstrap?.user || state.session?.user || {}).codigoCensista;
-  return `<article class="list-card"><div class="list-card-icon">${icon('cloud-upload')}</div><div><strong>${escapeHtml(record.recordId)}</strong><span>${escapeHtml(school?.nombre || record.codigoEscuela)} · ${record.cantidadFotos || 0} fotos</span><small>${statusLabel(record.estado)} · ${record.durationSeconds ? minutesLabel(record.durationSeconds / 60) : 'Tiempo no disponible'} · ${formatDateTime(record.updatedAt || record.syncedAt)}</small></div>${own ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="continue-record" data-record="${escapeHtml(record.recordKey)}">${icon('pencil')} Continuar</button></div>` : ''}</article>`;
+  const own = isOwnRecord(record);
+  const recordKey = recordKeyOf(record);
+  const actions = own && recordKey
+    ? `<div class="list-card-actions"><button class="btn btn-secondary" data-action="edit-record" data-record="${escapeHtml(recordKey)}">${icon('pencil')} Editar</button></div>`
+    : `<div class="list-card-actions"><span class="protected-label" title="Registro creado por otro integrante del equipo">${icon('eye', 14)} Solo lectura</span></div>`;
+  return `<article class="list-card"><div class="list-card-icon">${icon('cloud-upload')}</div><div><strong>${escapeHtml(record.recordId)}</strong><span>${escapeHtml(school?.nombre || record.codigoEscuela)} · ${record.cantidadFotos || 0} fotos</span><small>${statusLabel(record.estado)} · ${record.durationSeconds ? minutesLabel(record.durationSeconds / 60) : 'Tiempo no disponible'} · ${formatDateTime(record.updatedAt || record.syncedAt)}</small></div>${actions}</article>`;
 }
 
 function renderMyPerformance(performance = {}) {
@@ -682,6 +708,14 @@ function operationsAllowed() {
   return ['ADMIN', 'SUPERVISOR'].includes((state.bootstrap?.user || {}).rol);
 }
 
+function supervisorMode() {
+  return (state.bootstrap?.user || state.session?.user || {}).rol === 'SUPERVISOR';
+}
+
+function operationalCatalog() {
+  return supervisorMode() ? availableSchools() : state.catalog;
+}
+
 function renderOperationsGuard() {
   return `<section class="view">${renderEmpty('shield-alert', 'Acceso restringido.', 'Esta vista requiere rol de supervision o administracion.')}</section>`;
 }
@@ -706,22 +740,37 @@ function renderAdmin() {
   if (!state.admin) return renderOperationsLoading('Control');
   const counts = state.admin.counts || {};
   const progress = state.bootstrap?.progress || {};
-  const completedSchools = state.catalog.filter((school) => schoolStatus(progress, school.codigo) === 'FINALIZADO').length;
+  const catalog = operationalCatalog();
+  const physicalSites = new Set(catalog.map((school) => school.sitioId || school.codigo)).size;
+  const sharedSites = [...new Set(catalog.map((school) => school.sitioId || school.codigo))]
+    .filter((site) => catalog.filter((school) => (school.sitioId || school.codigo) === site).length > 1).length;
+  const completedSchools = catalog.filter((school) => schoolStatus(progress, school.codigo) === 'FINALIZADO').length;
+  const teamName = String((state.bootstrap?.user || {}).equipo || '');
   return `<section class="view operations-view">
-    <div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>Resumen general</h1><p>Avance consolidado del relevamiento fotografico.</p></div><div class="button-row">${state.admin.photoRootUrl ? `<a class="btn btn-secondary" href="${escapeHtml(state.admin.photoRootUrl)}" target="_blank" rel="noopener">${icon('folder-open')} Abrir fotos</a>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
+    <div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>${supervisorMode() ? `Resumen de ${escapeHtml(teamName || 'mi equipo')}` : 'Resumen general'}</h1><p>${supervisorMode() ? 'Escuelas, encuestadores y avance asignados exclusivamente a su equipo.' : 'Avance consolidado del relevamiento fotografico.'}</p></div><div class="button-row"><button class="btn btn-primary" data-action="export-rue" ${state.rueExporting ? 'disabled' : ''}>${icon('file-down')} ${state.rueExporting ? 'Preparando...' : 'Conciliar con RUE'}</button>${state.admin.photoRootUrl ? `<a class="btn btn-secondary" href="${escapeHtml(state.admin.photoRootUrl)}" target="_blank" rel="noopener">${icon('folder-open')} Abrir fotos</a>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
     ${renderAdminTabs('admin')}
     <div class="summary-strip admin-summary">
-      <div><span>Escuelas finalizadas</span><strong>${completedSchools}/${state.catalog.length}</strong></div>
+      <div><span>Escuelas finalizadas</span><strong>${completedSchools}/${catalog.length}</strong></div>
       <div><span>Encuestadores activos</span><strong>${(state.admin.users || []).filter((item) => item.activo && item.rol === 'ENCUESTADOR').length}</strong></div>
       <div><span>Registros</span><strong>${counts.registros || 0}</strong></div>
       <div><span>Fotos</span><strong>${counts.fotos || 0}</strong></div>
       <div><span>Solicitudes pendientes</span><strong>${counts.solicitudesPendientes || 0}</strong></div>
     </div>
+    <section class="content-section rue-compatibility-panel">
+      <div class="section-heading"><div><h2>Compatibilidad RUE</h2><p>Contrato RUE–CIALPA 1.0: conserva la clave interna y agrega el codigo RUE de siete digitos, la sede fisica y la equivalencia de bloque, planta y espacio.</p></div><a class="btn btn-secondary" href="https://demo.mec.gov.py/demo_rue/infraestructuras_fiscalizaciones_v2/index" target="_blank" rel="noopener">${icon('external-link')} Abrir RUE demo</a></div>
+      <div class="summary-strip compatibility-summary">
+        <div><span>Codigos RUE</span><strong>${catalog.length}</strong><small>Establecimientos visibles</small></div>
+        <div><span>Sedes fisicas</span><strong>${physicalSites}</strong><small>Unidad operativa de visita</small></div>
+        <div><span>Sedes compartidas</span><strong>${sharedSites}</strong><small>Dos codigos, una construccion</small></div>
+        <div><span>Formato de intercambio</span><strong>CSV</strong><small>UTF-8 y trazable por foto</small></div>
+      </div>
+      <div class="alert alert-info">${icon('info')}<span>El archivo de conciliacion no escribe dentro de RUE: prepara datos y evidencias con claves comunes para revision o importacion por un mecanismo autorizado del MEC.</span></div>
+    </section>
     ${renderTeamPerformanceAdmin(state.admin.performance)}
-    <section class="content-section"><div class="section-heading"><div><h2>Avance por censista</h2><p>Carga recibida, equipo y escuelas asignadas.</p></div><button class="btn btn-secondary" data-view="surveyors">${icon('users')} Administrar</button></div>
+    <section class="content-section"><div class="section-heading"><div><h2>Avance por censista</h2><p>Carga recibida, equipo y escuelas asignadas.</p></div><button class="btn btn-secondary" data-view="surveyors">${icon('users')} ${supervisorMode() ? 'Ver integrantes' : 'Administrar'}</button></div>
       <div class="data-table-wrap"><table><thead><tr><th>Censista</th><th>Equipo</th><th>Disponibilidad</th><th>Fichas</th><th>Finalizadas</th><th>Promedio</th><th>Mediana</th><th>Fotos</th><th>Ultima carga</th></tr></thead><tbody>${(state.admin.performance?.individuals || []).map((item) => `<tr><td><strong>${escapeHtml(displayName(item))}</strong><br><small>${escapeHtml(item.codigoCensista)}</small></td><td>${escapeHtml(item.equipo || 'Sin equipo')}</td><td><span class="status-pill ${item.disponibleCampo ? 'status-finalizado' : 'status-con_pendientes'}">${item.disponibleCampo ? 'Disponible' : 'Ausente'}</span></td><td>${item.records || 0}</td><td>${item.completedRecords || 0}</td><td>${minutesLabel(item.averageMinutes)}</td><td>${minutesLabel(item.medianMinutes)}</td><td>${item.photos || 0}</td><td>${formatDateTime(item.lastActivity)}</td></tr>`).join('') || '<tr><td colspan="9">Aun no hay censistas registrados.</td></tr>'}</tbody></table></div>
     </section>
-    <section class="content-section"><div class="section-heading"><div><h2>Registros recientes</h2><p>Ultimas cargas de todos los usuarios.</p></div></div>
+    <section class="content-section"><div class="section-heading"><div><h2>Registros recientes</h2><p>${supervisorMode() ? 'Ultimas cargas de los integrantes de su equipo.' : 'Ultimas cargas de todos los usuarios.'}</p></div></div>
       <div class="data-table-wrap"><table><thead><tr><th>Registro</th><th>Escuela</th><th>Censista</th><th>Estado</th><th>Fotos</th><th>Actualizacion</th></tr></thead><tbody>${(state.admin.records || []).slice(0, 50).map((record) => `<tr><td><strong>${escapeHtml(record.recordId)}</strong></td><td>${escapeHtml(record.codigoEscuela)}</td><td>${escapeHtml(record.codigoCensista)}</td><td><span class="status-pill status-${String(record.estado || 'PENDIENTE').toLowerCase()}">${statusLabel(record.estado)}</span></td><td>${record.cantidadFotos || 0}</td><td>${formatDateTime(record.updatedAt || record.syncedAt)}</td></tr>`).join('') || '<tr><td colspan="6">Aun no hay registros.</td></tr>'}</tbody></table></div>
     </section>
   </section>`;
@@ -742,8 +791,9 @@ function renderSurveyors() {
   });
   const editing = users.find((item) => String(item.codigoCensista) === state.editingUserCode) || null;
   const activeSurveyors = users.filter((item) => item.activo && item.rol === 'ENCUESTADOR').length;
+  const teamName = String(currentUser.equipo || '');
   return `<section class="view operations-view">
-    <div class="view-heading"><div><p class="eyebrow">Equipo de campo</p><h1>Administrar encuestadores</h1><p>${filtered.length} usuarios visibles de ${users.length}.</p></div><div class="button-row">${currentUser.rol === 'ADMIN' ? `<button class="btn btn-primary" data-action="new-user">${icon('user-plus')} Nuevo encuestador</button>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
+    <div class="view-heading"><div><p class="eyebrow">Equipo de campo</p><h1>${supervisorMode() ? `Encuestadores de ${escapeHtml(teamName || 'mi equipo')}` : 'Administrar encuestadores'}</h1><p>${supervisorMode() ? 'Lista de integrantes asignados a su equipo.' : `${filtered.length} usuarios visibles de ${users.length}.`}</p></div><div class="button-row">${currentUser.rol === 'ADMIN' ? `<button class="btn btn-primary" data-action="new-user">${icon('user-plus')} Nuevo encuestador</button>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
     ${renderAdminTabs('surveyors')}
     <div class="summary-strip">
       <div><span>Total de usuarios</span><strong>${users.length}</strong></div>
@@ -793,14 +843,15 @@ function renderLogistics() {
   const progress = state.bootstrap?.progress || {};
   const assignments = state.logisticsDraft || {};
   const fieldUsers = teamAssignmentOptions(users);
-  const changed = changedAssignmentItems(state.logisticsOriginal, assignments, state.catalog);
-  const metrics = logisticsMetrics(state.catalog, fieldUsers, assignments, progress, state.planningSettings);
-  const workloads = buildWorkloads(fieldUsers, state.catalog, assignments, progress, state.admin.surveyorSummary || []);
-  const departments = [...new Set(state.catalog.map((school) => school.departamento))].sort();
-  const districts = [...new Set(state.catalog
+  const catalog = operationalCatalog();
+  const changed = changedAssignmentItems(state.logisticsOriginal, assignments, catalog);
+  const metrics = logisticsMetrics(catalog, fieldUsers, assignments, progress, state.planningSettings);
+  const workloads = buildWorkloads(fieldUsers, catalog, assignments, progress, state.admin.surveyorSummary || []);
+  const departments = [...new Set(catalog.map((school) => school.departamento))].sort();
+  const districts = [...new Set(catalog
     .filter((school) => !state.adminFilters.logisticsDepartment || school.departamento === state.adminFilters.logisticsDepartment)
     .map((school) => school.distrito))].sort();
-  const filtered = filterLogisticsSchools(state.catalog, progress, assignments, {
+  const filtered = filterLogisticsSchools(catalog, progress, assignments, {
     search: state.adminFilters.logisticsSearch,
     department: state.adminFilters.logisticsDepartment,
     district: state.adminFilters.logisticsDistrict,
@@ -809,7 +860,7 @@ function renderLogistics() {
   });
   const maxLoad = Math.max(1, ...workloads.map((item) => item.asignadas));
   return `<section class="view operations-view logistics-view">
-    <div class="view-heading"><div><p class="eyebrow">Planificacion territorial</p><h1>Logistica de campo</h1><p>${filtered.length} escuelas visibles de ${state.catalog.length}.</p></div><div class="button-row"><button class="btn btn-secondary" data-action="export-logistics">${icon('download')} CSV</button><button class="btn btn-secondary" data-action="undo-logistics" ${changed.length ? '' : 'disabled'}>${icon('undo-2')} Deshacer</button><button class="btn btn-primary" data-action="save-logistics" ${changed.length && !state.logisticsSaving ? '' : 'disabled'}>${icon('save')} ${state.logisticsSaving ? 'Guardando...' : `Guardar ${changed.length || ''} cambio${changed.length === 1 ? '' : 's'}`}</button></div></div>
+    <div class="view-heading"><div><p class="eyebrow">Planificacion territorial</p><h1>Logistica de campo</h1><p>${filtered.length} escuelas visibles de ${catalog.length}${supervisorMode() ? ' en su equipo' : ''}.</p></div><div class="button-row"><button class="btn btn-secondary" data-action="export-logistics">${icon('download')} CSV</button><button class="btn btn-secondary" data-action="undo-logistics" ${changed.length ? '' : 'disabled'}>${icon('undo-2')} Deshacer</button><button class="btn btn-primary" data-action="save-logistics" ${changed.length && !state.logisticsSaving ? '' : 'disabled'}>${icon('save')} ${state.logisticsSaving ? 'Guardando...' : `Guardar ${changed.length || ''} cambio${changed.length === 1 ? '' : 's'}`}</button></div></div>
     ${renderAdminTabs('logistics')}
     <div class="planning-band">
       <label>Minutos por escuela<input type="number" min="5" max="1440" step="5" data-planning-setting="baseMinutes" value="${state.planningSettings.baseMinutes}"></label>
@@ -823,7 +874,7 @@ function renderLogistics() {
     ${changed.length ? `<div class="dirty-banner">${icon('circle-dot')}<span><strong>${changed.length} cambio${changed.length === 1 ? '' : 's'} sin guardar.</strong> La hoja en linea aun no fue modificada.</span></div>` : ''}
     <section class="content-section"><div class="section-heading"><div><h2>Carga por equipo</h2><p>${metrics.encuestadoresActivos} equipos activos · ${metrics.encuestadoresNecesarios} necesarios para el plazo indicado · ${formatNumber(metrics.jornadasPersona, 1)} jornadas-equipo.</p></div></div>
       <div class="workload-grid">${workloads.map((item) => {
-        const assignedSchools = state.catalog.filter((school) => assignments[school.codigo] === item.codigoCensista && schoolStatus(progress, school.codigo) !== 'FINALIZADO');
+        const assignedSchools = catalog.filter((school) => assignments[school.codigo] === item.codigoCensista && schoolStatus(progress, school.codigo) !== 'FINALIZADO');
         const routeUrl = googleRouteUrl(assignedSchools);
         return `<article class="workload-row"><span class="avatar small">${escapeHtml(initials(item))}</span><div><strong>${escapeHtml(displayName(item))}</strong><small>${item.finalizadas} finalizadas · ${item.pendientes} pendientes · ${item.fotos} fotos</small><span class="workload-track"><i style="width:${Math.round(item.asignadas / maxLoad * 100)}%"></i></span></div><b>${item.asignadas}</b>${routeUrl ? `<a class="icon-btn" href="${escapeHtml(routeUrl)}" target="_blank" rel="noopener" title="Abrir primeras escuelas pendientes en Google Maps" aria-label="Abrir ruta de ${escapeHtml(displayName(item))}">${icon('navigation')}</a>` : '<span class="route-placeholder"></span>'}</article>`;
       }).join('') || renderEmpty('users', 'No hay encuestadores activos.', '')}</div>
@@ -839,7 +890,7 @@ function renderLogistics() {
       const assignedCode = String(assignments[school.codigo] || '');
       const originalCode = String(state.logisticsOriginal[school.codigo] || '');
       const assignedUser = users.find((item) => item.codigoCensista === assignedCode);
-      return `<tr class="${assignedCode !== originalCode ? 'is-dirty' : ''}"><td>${school.ordenMuestra || ''}</td><td><strong>${escapeHtml(school.nombre)}</strong><br><small>${escapeHtml(school.codigo)} · ${escapeHtml(school.localidad)}</small></td><td>${escapeHtml(school.departamento)}<br><small>${escapeHtml(school.distrito)}</small></td><td><span class="status-pill status-${schoolStatus(progress, school.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, school.codigo))}</span></td><td><select data-logistics-assignment="${school.codigo}" aria-label="Equipo para ${escapeHtml(school.nombre)}"><option value="">Sin asignar</option>${assignedUser && !fieldUsers.some((item) => item.codigoCensista === assignedCode) ? `<option value="${escapeHtml(assignedCode)}" selected>${escapeHtml(displayName(assignedUser))} (inactivo)</option>` : ''}${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${assignedCode === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))}</option>`).join('')}</select></td><td><a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${school.latitud},${school.longitud}" target="_blank" rel="noopener" title="Ver escuela en Google Maps" aria-label="Ver ${escapeHtml(school.nombre)} en Google Maps">${icon('map-pin')}</a></td></tr>`;
+      return `<tr class="${assignedCode !== originalCode ? 'is-dirty' : ''}"><td>${school.ordenMuestra || ''}</td><td><strong>${escapeHtml(school.nombre)}</strong><br><small>RUE ${escapeHtml(school.codigoRue || normalizeRueSchoolCode(school.codigo))} · Interno ${escapeHtml(school.codigo)} · ${escapeHtml(school.sitioId || '')} · ${escapeHtml(school.localidad)}</small></td><td>${escapeHtml(school.departamento)}<br><small>${escapeHtml(school.distrito)}</small></td><td><span class="status-pill status-${schoolStatus(progress, school.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, school.codigo))}</span></td><td><select data-logistics-assignment="${school.codigo}" aria-label="Equipo para ${escapeHtml(school.nombre)}"><option value="">Sin asignar</option>${assignedUser && !fieldUsers.some((item) => item.codigoCensista === assignedCode) ? `<option value="${escapeHtml(assignedCode)}" selected>${escapeHtml(displayName(assignedUser))} (inactivo)</option>` : ''}${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${assignedCode === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))}</option>`).join('')}</select></td><td><a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${school.latitud},${school.longitud}" target="_blank" rel="noopener" title="Ver escuela en Google Maps" aria-label="Ver ${escapeHtml(school.nombre)} en Google Maps">${icon('map-pin')}</a></td></tr>`;
     }).join('') || '<tr><td colspan="6">No hay escuelas con estos filtros.</td></tr>'}</tbody></table></div>
     </section>
   </section>`;
@@ -999,7 +1050,7 @@ function mountView() {
   if (state.view === 'schools') {
     const element = document.querySelector('#school-map');
     state.map = new SchoolMap(element, (code) => {
-      state.selectedSchoolCode = code;
+      state.selectedSchoolCode = canonicalSchoolCode(code);
       render();
     });
     const schools = filteredSchools();
@@ -1026,7 +1077,7 @@ async function loadAdmin(force = false) {
   state.adminLoading = true;
   if (force) state.admin = null;
   try {
-    state.admin = await api.adminDashboard();
+    state.admin = normalizeAdminSchoolCodes(await api.adminDashboard());
     if (force || !state.logisticsInitialized) resetLogisticsDraft();
   } catch (error) {
     toast(error.message, 'error');
@@ -1157,10 +1208,17 @@ async function enqueueDraft(draft) {
 
 function buildRecordPayload(draft) {
   const user = state.bootstrap?.user || state.session?.user;
+  const school = schoolByCode(draft.codigoEscuela) || {};
+  const schoolCode = canonicalSchoolCode(draft.codigoEscuela);
+  const compatibility = {
+    codigoRue: school.codigoRue || normalizeRueSchoolCode(draft.codigoEscuela),
+    sitioId: school.sitioId || '',
+    rueSection: rueSectionForSpace(draft.tipoEspacio)
+  };
   return {
     recordId: calculateRecordId(draft),
     idempotencyKey: draft.idempotencyKey,
-    codigoEscuela: draft.codigoEscuela,
+    codigoEscuela: schoolCode,
     codigoCensista: user.codigoCensista,
     numeroFormulario: digits(draft.numeroFormulario),
     numeroHoja: digits(draft.numeroHoja),
@@ -1168,6 +1226,8 @@ function buildRecordPayload(draft) {
     piso: digits(draft.piso),
     espacio: digits(draft.espacio),
     tipoEspacio: draft.tipoEspacio,
+    ...compatibility,
+    rueSpaceKey: rueSpaceKey(draft, school),
     estado: draft.estado,
     observaciones: draft.observaciones,
     danosFallas: draft.danosFallas,
@@ -1287,7 +1347,7 @@ async function toggleAvailability(code, available) {
 }
 
 async function saveLogistics() {
-  const items = changedAssignmentItems(state.logisticsOriginal, state.logisticsDraft, state.catalog);
+  const items = changedAssignmentItems(state.logisticsOriginal, state.logisticsDraft, operationalCatalog());
   if (!items.length || state.logisticsSaving) return;
   state.logisticsSaving = true;
   render();
@@ -1305,7 +1365,7 @@ async function saveLogistics() {
 function balanceLogistics() {
   if (!confirm('Se redistribuiran en el borrador todas las escuelas no finalizadas. ¿Continuar?')) return;
   const balanced = balancePendingAssignments(
-    state.catalog,
+    operationalCatalog(),
     teamAssignmentOptions(state.admin?.users || []),
     state.logisticsDraft,
     state.bootstrap?.progress || {}
@@ -1318,7 +1378,7 @@ function balanceLogistics() {
 
 function exportLogistics() {
   const content = logisticsCsv(
-    state.catalog,
+    operationalCatalog(),
     state.admin?.users || [],
     state.logisticsDraft,
     state.bootstrap?.progress || {}
@@ -1332,6 +1392,35 @@ function exportLogistics() {
   link.remove();
   URL.revokeObjectURL(url);
   toast('CSV de logistica generado.', 'success');
+}
+
+async function exportRueCompatibility() {
+  if (state.rueExporting) return;
+  state.rueExporting = true;
+  render();
+  try {
+    const remote = normalizeRemoteSchoolCodes(await api.listRecords());
+    const rows = buildRueCompatibilityRows(remote.records || [], remote.photos || [], operationalCatalog());
+    if (!rows.length) throw new Error('Aun no hay registros para conciliar con RUE.');
+    const summary = rueCompatibilitySummary(rows);
+    const content = rueCompatibilityCsv(rows);
+    const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `cialpa-compatibilidad-rue-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    if (summary.withIssues) {
+      toast(`Archivo generado: ${summary.compatible} registros compatibles y ${summary.withIssues} para revisar.`, 'warning', 7500);
+    } else {
+      toast(`Archivo RUE generado: ${summary.records} registros y ${summary.evidenceRows} evidencias compatibles.`, 'success', 6500);
+    }
+  } finally {
+    state.rueExporting = false;
+    render();
+  }
 }
 
 async function handleClick(event) {
@@ -1353,7 +1442,7 @@ async function handleClick(event) {
     refreshIcons();
   }
   if (action === 'select-school') {
-    state.selectedSchoolCode = button.dataset.school;
+    state.selectedSchoolCode = canonicalSchoolCode(button.dataset.school);
     render();
   }
   if (action === 'clear-school') {
@@ -1361,13 +1450,13 @@ async function handleClick(event) {
     render();
   }
   if (action === 'start-record') {
-    state.selectedSchoolCode = button.dataset.school;
-    state.activeDraft = newDraft(button.dataset.school);
+    state.selectedSchoolCode = canonicalSchoolCode(button.dataset.school);
+    state.activeDraft = newDraft(state.selectedSchoolCode);
     state.view = 'register';
     render();
   }
   if (action === 'show-school') {
-    state.selectedSchoolCode = button.dataset.school;
+    state.selectedSchoolCode = canonicalSchoolCode(button.dataset.school);
     state.view = 'schools';
     render();
   }
@@ -1381,7 +1470,7 @@ async function handleClick(event) {
   if (action === 'locate') await locateOnMap();
   if (action === 'locate-journal') await locateOnMap();
   if (action === 'open-draft') await openDraft(button.dataset.draft);
-  if (action === 'continue-record') await openRemoteRecord(button.dataset.record);
+  if (action === 'edit-record') await openRemoteRecord(button.dataset.record);
   if (action === 'delete-draft') await deleteDraft(button.dataset.draft);
   if (action === 'sync') await syncQueue();
   if (action === 'reload-records') {
@@ -1414,6 +1503,7 @@ async function handleClick(event) {
   }
   if (action === 'save-logistics') await saveLogistics();
   if (action === 'export-logistics') exportLogistics();
+  if (action === 'export-rue') await exportRueCompatibility();
   if (action === 'review-access') await reviewAccess(button.dataset.request, button.dataset.status);
   if (action === 'copy-incident-template') await copyIncidentTemplate();
   if (action === 'install') await installApp();
@@ -1546,20 +1636,19 @@ async function openDraft(draftId) {
 }
 
 async function openRemoteRecord(recordKey) {
-  const record = (state.remote?.records || []).find((item) => item.recordKey === recordKey);
-  const user = state.bootstrap?.user || state.session?.user || {};
-  if (!record || record.codigoCensista !== user.codigoCensista) {
+  const record = (state.remote?.records || []).find((item) => recordKeyOf(item) === recordKey);
+  if (!record || !isOwnRecord(record)) {
     throw new Error('Este registro no puede editarse con la sesion actual.');
   }
   const photos = (state.remote?.photos || [])
-    .filter((photo) => photo.recordKey === record.recordKey)
+    .filter((photo) => recordKeyOf(photo) === recordKey)
     .sort((left, right) => Number(left.secuencia || 0) - Number(right.secuencia || 0))
     .map((photo) => ({ ...photo, synced: true, blobId: '' }));
   state.activeDraft = {
     draftId: crypto.randomUUID(),
-    sourceRecordKey: record.recordKey,
+    sourceRecordKey: recordKeyOf(record),
     idempotencyKey: crypto.randomUUID(),
-    codigoEscuela: record.codigoEscuela,
+    codigoEscuela: canonicalSchoolCode(record.codigoEscuela),
     numeroFormulario: record.numeroFormulario,
     numeroHoja: record.numeroHoja,
     bloque: record.bloque,
@@ -1685,18 +1774,150 @@ function handleInput(event) {
   }, 180);
 }
 
+function canonicalSchoolCode(code) {
+  return canonicalAppSchoolCode(state.catalog, code);
+}
+
 function schoolByCode(code) {
-  return state.catalog.find((school) => school.codigo === code) || null;
+  return findSchoolByCode(state.catalog, code);
+}
+
+function normalizeBootstrapSchoolCodes(data = {}) {
+  const statusPriority = { PENDIENTE: 0, FINALIZADO: 1, EN_PROCESO: 2, CON_PENDIENTES: 3 };
+  const progress = {};
+  Object.entries(data.progress || {}).forEach(([code, item]) => {
+    const canonical = canonicalSchoolCode(code);
+    if (!canonical) return;
+    const previous = progress[canonical] || { registros: 0, fotos: 0, estado: 'PENDIENTE' };
+    const incomingStatus = String(item?.estado || 'PENDIENTE').toUpperCase();
+    progress[canonical] = {
+      ...previous,
+      ...item,
+      registros: Math.max(Number(previous.registros || 0), Number(item?.registros || 0)),
+      fotos: Math.max(Number(previous.fotos || 0), Number(item?.fotos || 0)),
+      estado: (statusPriority[incomingStatus] || 0) >= (statusPriority[previous.estado] || 0)
+        ? incomingStatus
+        : previous.estado
+    };
+  });
+  const assignedCodes = [...new Set((data.assignedCodes || []).map(canonicalSchoolCode).filter(Boolean))];
+  const role = String(data.user?.rol || '').toUpperCase();
+  const allowedSchools = new Set(assignedCodes);
+  const scopedProgress = role === 'ADMIN'
+    ? progress
+    : Object.fromEntries(Object.entries(progress).filter(([code]) => allowedSchools.has(code)));
+  const recentRecords = (data.recentRecords || []).map((record) => ({
+    ...record,
+    codigoEscuela: canonicalSchoolCode(record.codigoEscuela)
+  })).filter((record) => role === 'ADMIN' || allowedSchools.has(record.codigoEscuela));
+  return {
+    ...data,
+    assignedCodes,
+    showAllSchools: role === 'ADMIN',
+    progress: scopedProgress,
+    recentRecords
+  };
+}
+
+function normalizeRemoteSchoolCodes(data = {}) {
+  const normalizeItem = (item) => ({
+    ...item,
+    codigoEscuela: canonicalSchoolCode(item.codigoEscuela),
+    codigoRue: item.codigoRue || schoolByCode(item.codigoEscuela)?.codigoRue || normalizeRueSchoolCode(item.codigoEscuela),
+    sitioId: item.sitioId || schoolByCode(item.codigoEscuela)?.sitioId || ''
+  });
+  const role = String((state.bootstrap?.user || state.session?.user || {}).rol || '').toUpperCase();
+  const allowedSchools = new Set((state.bootstrap?.assignedCodes || []).map(canonicalSchoolCode).filter(Boolean));
+  const records = (data.records || []).map(normalizeItem)
+    .filter((item) => role === 'ADMIN' || allowedSchools.has(item.codigoEscuela));
+  const recordKeys = new Set(records.map(recordKeyOf).filter(Boolean));
+  const photos = (data.photos || []).map(normalizeItem).filter((item) => {
+    if (role === 'ADMIN') return true;
+    const key = recordKeyOf(item);
+    return (key && recordKeys.has(key)) || allowedSchools.has(item.codigoEscuela);
+  });
+  return {
+    ...data,
+    records,
+    photos
+  };
+}
+
+function normalizeAdminSchoolCodes(data = {}) {
+  const assignments = (data.assignments || []).map((assignment) => ({
+    ...assignment,
+    codigoEscuela: canonicalSchoolCode(assignment.codigoEscuela)
+  }));
+  if (!supervisorMode()) return { ...data, assignments };
+
+  const current = state.bootstrap?.user || {};
+  const team = String(current.equipo || '').trim();
+  const users = (data.users || []).filter((user) => team && String(user.equipo || '').trim() === team);
+  const allowedUsers = new Set(users.map((user) => String(user.codigoCensista)));
+  const allowedSchools = new Set((state.bootstrap?.assignedCodes || []).map(canonicalSchoolCode).filter(Boolean));
+  const scopedAssignments = assignments.filter((assignment) => allowedUsers.has(String(assignment.codigoCensista))
+    && allowedSchools.has(assignment.codigoEscuela));
+  const records = (data.records || []).map((record) => ({
+    ...record,
+    codigoEscuela: canonicalSchoolCode(record.codigoEscuela)
+  })).filter((record) => allowedUsers.has(String(record.codigoCensista)) && allowedSchools.has(record.codigoEscuela));
+  const surveyorSummary = (data.surveyorSummary || []).filter((item) => allowedUsers.has(String(item.codigoCensista)));
+  const requests = (data.requests || []).filter((request) => allowedUsers.has(String(request.codigoCensista)));
+  const performance = {
+    ...(data.performance || {}),
+    individuals: (data.performance?.individuals || []).filter((item) => allowedUsers.has(String(item.codigoCensista))),
+    teams: (data.performance?.teams || []).filter((item) => String(item.equipo || '').trim() === team)
+  };
+  return {
+    ...data,
+    counts: {
+      usuarios: users.length,
+      asignaciones: scopedAssignments.filter((item) => item.activo !== false).length,
+      registros: records.length,
+      fotos: surveyorSummary.reduce((sum, item) => sum + Number(item.fotos || 0), 0),
+      solicitudesPendientes: requests.filter((item) => item.estado === 'PENDIENTE').length
+    },
+    users,
+    assignments: scopedAssignments,
+    requests,
+    surveyorSummary,
+    records,
+    photoRootUrl: '',
+    performance
+  };
 }
 
 function calculateRecordId(draft) {
-  if (!draft?.codigoEscuela) return '';
+  const schoolCode = canonicalSchoolCode(draft?.codigoEscuela);
+  if (!schoolCode) return '';
   const values = [draft.bloque, draft.piso, draft.espacio, draft.numeroHoja];
   if (values.some((value) => !/^\d+$/.test(String(value || '')))) return '';
-  return `${draft.codigoEscuela}-B${digits(draft.bloque).padStart(2, '0')}-P${digits(draft.piso).padStart(2, '0')}-E${digits(draft.espacio).padStart(3, '0')}-H${digits(draft.numeroHoja).padStart(2, '0')}`;
+  return `${schoolCode}-B${digits(draft.bloque).padStart(2, '0')}-P${digits(draft.piso).padStart(2, '0')}-E${digits(draft.espacio).padStart(3, '0')}-H${digits(draft.numeroHoja).padStart(2, '0')}`;
 }
 
 function digits(value) { return String(value || '').replace(/\D/g, ''); }
+
+function normalizedCensistaCode(value) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return normalized === 'admin' ? normalized : digits(normalized);
+}
+
+function currentUserCode() {
+  return normalizedCensistaCode((state.bootstrap?.user || state.session?.user || {}).codigoCensista);
+}
+
+function recordKeyOf(record) {
+  const explicit = String(record?.recordKey || '').trim();
+  if (explicit) return explicit;
+  const owner = normalizedCensistaCode(record?.codigoCensista);
+  const recordId = String(record?.recordId || '').trim();
+  return owner && recordId ? `${owner}:${recordId}` : '';
+}
+
+function isOwnRecord(record) {
+  const owner = normalizedCensistaCode(record?.codigoCensista);
+  return Boolean(owner && currentUserCode() && owner === currentUserCode());
+}
 
 function loginCode(value) {
   const normalized = String(value || '').trim().toLowerCase();

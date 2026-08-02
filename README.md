@@ -10,18 +10,30 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 4. Selecciona el tipo y numero de elemento y abre la camara.
 5. La app reduce la imagen y agrega un pie sin tapar la fotografia.
 6. El registro y las fotos se sincronizan; sin internet quedan en IndexedDB hasta recuperar conexion.
-7. Desde **Mi jornada** puede reabrir un registro sincronizado y continuar la secuencia de fotos sin perder los codigos anteriores.
+7. Desde **Mi jornada** puede pulsar **Editar** en un registro sincronizado propio y continuar la secuencia de fotos sin perder los codigos anteriores. Los registros creados por otro integrante del equipo se identifican como **Solo lectura**.
 
 ## Operacion y supervision
 
+- Los campos, encabezados, indicadores y acciones principales incorporan ayuda emergente **(i)** basada en el manual operativo, accesible con teclado y adaptada a celular.
 - **Mi jornada** muestra avance personal, siguiente escuela, borradores, cola local, registros sincronizados, tiempos por ficha y KPI propios y del equipo.
-- **Control** consolida escuelas atendidas, registros, fotos, solicitudes, disponibilidad, rendimiento por censista y proyeccion de plazo por equipo.
-- **Encuestadores** muestra los 16 integrantes y su pertenencia a los 8 equipos; permite al administrador crear, editar, activar y desactivar usuarios, mientras la cuenta administrativa principal permanece protegida.
-- **Logistica** administra la distribucion por equipo, filtra por territorio y estado, compara cargas, prepara rutas y guarda asignaciones por lote.
+- **Control** consolida escuelas atendidas, registros, fotos, solicitudes, disponibilidad, rendimiento por censista y proyeccion de plazo. El supervisor recibe solo los datos de su equipo; el administrador conserva la vista general.
+- **Encuestadores** muestra al supervisor su propia lista de integrantes asignados. El administrador puede ver los 16 integrantes de los 8 equipos, crear, editar, activar y desactivar usuarios, mientras la cuenta administrativa principal permanece protegida.
+- **Logistica** administra la distribucion por equipo, filtra por territorio y estado, compara cargas, prepara rutas y guarda asignaciones por lote. Para el supervisor, catalogo, personas y cambios quedan limitados a su equipo.
 - **Solicitudes** mantiene una bandeja separada por estado para aprobar o rechazar accesos.
 - **Guia de campo** integra las cuatro reglas de control, la secuencia fotografica, la recuperacion sin conexion, los errores criticos y una plantilla copiable para incidencias.
 - El cierre evita marcar **Finalizado** sin GPS y exige explicar en **Observaciones** cualquier registro **Con pendientes**.
 - El CSV logistico conserva escuela, ubicacion, estado, equipo e integrantes para coordinacion externa.
+- **Control > Conciliar con RUE** genera un manifiesto CSV de registros y evidencias con codigo RUE de siete digitos, sede fisica, bloque, planta, espacio y resultado de compatibilidad.
+
+## Compatibilidad con RUE
+
+- La app acepta indistintamente el codigo RUE de siete digitos o el codigo interno historico en busquedas, asignaciones y solicitudes al backend. Por ejemplo, `0011007`, `001-1007` y `11007` resuelven la misma escuela.
+- Los identificadores de registros, carpetas y asignaciones se conservan con el codigo interno canonico para no romper el historial; cada registro y fotografia guarda ademas `codigoRue` con siete digitos y `sitioId`.
+- Los 86 codigos se agrupan en 85 sedes mediante `sitioId`; `1108034` y `1108042` comparten `CIALPA-S051`.
+- Los tipos de espacio se traducen a las secciones RUE de bloques y plantas, aulas, dependencias, laboratorio/taller, sanitarios y areas de recreacion.
+- El manifiesto es una herramienta de conciliacion. No escribe dentro de RUE hasta que el MEC habilite una API o plantilla oficial de importacion.
+
+La matriz completa se documenta en `docs/COMPATIBILIDAD_RUE_CIALPA.md`.
 
 ## Tiempos, KPI y contingencias
 
@@ -52,6 +64,7 @@ El mismo codigo se usa en la imagen, el nombre del archivo, Google Drive y Googl
 - `gas/`: backend de Google Apps Script vinculado a la hoja de control.
 - `assets/js/api.js`: transporte POST por iframe y `postMessage` para comunicar GitHub Pages con GAS sin exponer datos en la URL.
 - `assets/js/operations.js`: filtros, metricas, balanceo, rutas y exportacion de la operacion territorial.
+- `assets/js/rue.js`: normalizacion de claves, correspondencia de secciones y manifiesto de conciliacion RUE–CIALPA.
 - `docs/`: ficha de contingencia imprimible y manual del censista.
 - `docs/MANUAL_CAPACITACION_CIALPA_FOTOS_2026-07-25.pdf`: material completo de capacitacion para censistas, supervisores y facilitadores.
 - `.github/workflows/pages.yml`: publicacion automatica de la PWA en GitHub Pages.

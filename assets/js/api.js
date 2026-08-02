@@ -59,6 +59,16 @@ function demoData() {
         rol: 'ENCUESTADOR',
         disponibleCampo: true,
         activo: true
+      },
+      {
+        codigoCensista: '5678901',
+        nombres: 'Sofia',
+        apellidos: 'Supervisora',
+        equipo: 'Equipo 1',
+        telefono: '0981000003',
+        rol: 'SUPERVISOR',
+        disponibleCampo: true,
+        activo: true
       }
     ],
     assignments: [
@@ -75,8 +85,23 @@ function saveDemo(data) {
   localStorage.setItem(demoStoreKey, JSON.stringify(data));
 }
 
-function demoPerformance(data) {
-  const individuals = data.users.filter((user) => user.rol !== 'ADMIN').map((user) => {
+function demoScope(data, payload = {}) {
+  const current = data.users.find((user) => user.codigoCensista === payload.session?.user?.codigoCensista)
+    || payload.session?.user || {};
+  const users = current.rol === 'ADMIN'
+    ? data.users
+    : data.users.filter((user) => current.equipo && user.equipo === current.equipo);
+  const userCodes = new Set(users.map((user) => user.codigoCensista));
+  const assignments = data.assignments.filter((item) => userCodes.has(item.codigoCensista));
+  const schoolCodes = new Set(assignments.filter((item) => item.activo).map((item) => item.codigoEscuela));
+  const records = data.records.filter((record) => userCodes.has(record.codigoCensista) && schoolCodes.has(record.codigoEscuela));
+  const recordKeys = new Set(records.map((record) => record.recordKey || `${record.codigoCensista}:${record.recordId}`));
+  const photos = data.photos.filter((photo) => recordKeys.has(photo.recordKey || `${photo.codigoCensista}:${photo.recordId}`));
+  return { current, users, userCodes, assignments, schoolCodes, records, recordKeys, photos };
+}
+
+function demoPerformance(data, teamFilter = '') {
+  const individuals = data.users.filter((user) => user.rol === 'ENCUESTADOR' && (!teamFilter || user.equipo === teamFilter)).map((user) => {
     const records = data.records.filter((record) => record.codigoCensista === user.codigoCensista);
     const durations = records.map((record) => Number(record.durationSeconds || 0)).filter((value) => value > 0);
     const average = durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length / 60 : 0;
@@ -169,10 +194,12 @@ async function demoRequest(action, payload = {}) {
     case 'bootstrap': {
       const user = data.users.find((item) => item.codigoCensista === payload.session?.user?.codigoCensista)
         || payload.session?.user;
+      const scope = demoScope(data, payload);
       const assignedCodes = data.assignments
-        .filter((item) => item.activo && item.codigoCensista === user.codigoCensista)
+        .filter((item) => item.activo && (user.rol === 'ADMIN' || scope.userCodes.has(item.codigoCensista)))
         .map((item) => item.codigoEscuela);
-      const progress = data.records.reduce((accumulator, record) => {
+      const visibleRecords = user.rol === 'ADMIN' ? data.records : scope.records;
+      const progress = visibleRecords.reduce((accumulator, record) => {
         const current = accumulator[record.codigoEscuela] || { registros: 0, fotos: 0, estado: 'PENDIENTE' };
         current.registros += 1;
         current.fotos += Number(record.cantidadFotos || 0);
@@ -185,9 +212,9 @@ async function demoRequest(action, payload = {}) {
       return {
         user,
         assignedCodes,
-        showAllSchools: ['ADMIN', 'SUPERVISOR'].includes(user.rol),
+        showAllSchools: user.rol === 'ADMIN',
         progress,
-        recentRecords: data.records.slice(-20).reverse(),
+        recentRecords: visibleRecords.slice(-20).reverse(),
         performance: {
           generatedAt: performance.generatedAt,
           individual,
@@ -219,36 +246,49 @@ async function demoRequest(action, payload = {}) {
       saveDemo(data);
       return { ok: true, fotoId: payload.photo.fotoId, uploadedAt: now };
     case 'listRecords':
-      return { records: data.records, photos: data.photos };
+      {
+        const scope = demoScope(data, payload);
+        return scope.current.rol === 'ADMIN'
+          ? { records: data.records, photos: data.photos }
+          : { records: scope.records, photos: scope.photos };
+      }
     case 'adminDashboard':
       {
-      const surveyorSummary = data.users.map((user) => {
-        const records = data.records.filter((record) => record.codigoCensista === user.codigoCensista);
+      const scope = demoScope(data, payload);
+      const dashboardUsers = scope.current.rol === 'ADMIN' ? data.users : scope.users;
+      const dashboardAssignments = scope.current.rol === 'ADMIN' ? data.assignments : scope.assignments;
+      const dashboardRecords = scope.current.rol === 'ADMIN' ? data.records : scope.records;
+      const dashboardPhotos = scope.current.rol === 'ADMIN' ? data.photos : scope.photos;
+      const dashboardRequests = scope.current.rol === 'ADMIN'
+        ? data.requests
+        : data.requests.filter((request) => scope.userCodes.has(request.codigoCensista));
+      const surveyorSummary = dashboardUsers.map((user) => {
+        const records = dashboardRecords.filter((record) => record.codigoCensista === user.codigoCensista);
         return {
           ...user,
-          escuelasAsignadas: data.assignments.filter((item) => item.activo && item.codigoCensista === user.codigoCensista).length,
+          escuelasAsignadas: dashboardAssignments.filter((item) => item.activo && item.codigoCensista === user.codigoCensista).length,
           registros: records.length,
           finalizados: records.filter((record) => record.estado === 'FINALIZADO').length,
           conPendientes: records.filter((record) => record.estado === 'CON_PENDIENTES').length,
-          fotos: data.photos.filter((photo) => photo.codigoCensista === user.codigoCensista).length,
+          fotos: dashboardPhotos.filter((photo) => photo.codigoCensista === user.codigoCensista).length,
           ultimaCarga: records.map((record) => record.updatedAt || record.syncedAt || '').sort().pop() || ''
         };
       });
       return {
         counts: {
-          usuarios: data.users.length,
-          asignaciones: data.assignments.filter((item) => item.activo).length,
-          registros: data.records.length,
-          fotos: data.photos.length,
-          solicitudesPendientes: data.requests.filter((item) => item.estado === 'PENDIENTE').length
+          usuarios: dashboardUsers.length,
+          asignaciones: dashboardAssignments.filter((item) => item.activo).length,
+          registros: dashboardRecords.length,
+          fotos: dashboardPhotos.length,
+          solicitudesPendientes: dashboardRequests.filter((item) => item.estado === 'PENDIENTE').length
         },
-        users: data.users,
-        assignments: data.assignments,
-        requests: data.requests,
-        records: data.records.slice(-100).reverse(),
+        users: dashboardUsers,
+        assignments: dashboardAssignments,
+        requests: dashboardRequests,
+        records: dashboardRecords.slice(-100).reverse(),
         surveyorSummary,
         photoRootUrl: '',
-        performance: demoPerformance(data)
+        performance: demoPerformance(data, scope.current.rol === 'ADMIN' ? '' : scope.current.equipo)
       };
       }
     case 'saveUser': {

@@ -1,5 +1,112 @@
 # Bitacora
 
+## 2026-08-01 - Ayuda contextual y alcance seguro del supervisor v1.6.0
+
+### Objetivo
+
+Permitir que censistas y supervisores consulten instrucciones del manual dentro de cada pantalla, y asegurar que el perfil supervisor vea y gestione solamente las escuelas y personas de su equipo.
+
+### Implementado
+
+- Nuevo modulo `assets/js/help.js` con ayuda emergente **(i)** para acceso, escuelas, codigos, formulario, fotografias, GPS, cierre, trabajo offline, KPI, RUE, usuarios, disponibilidad y logistica.
+- Componente accesible con dialogo no modal, cierre por boton, clic exterior o tecla Escape, foco recuperable y presentacion inferior adaptada a celulares.
+- Los campos conservan nombres accesibles propios y la ayuda no altera la operacion ni el contenido ya escrito.
+- El supervisor recibe en **Escuelas** el conjunto de ubicaciones asignadas a todos los integrantes de su equipo.
+- **Control**, **Encuestadores**, **Logistica**, registros, fotografias, KPI, solicitudes y exportaciones se filtran por equipo en frontend y backend.
+- Los KPI de capacidad cuentan solamente perfiles censistas; el supervisor permanece visible como integrante de coordinacion sin inflar la capacidad de levantamiento.
+- Las acciones de disponibilidad y reasignacion del supervisor validan en el servidor que la persona y la escuela pertenezcan a su equipo.
+- La administracion mantiene el alcance general y el acceso a la carpeta raiz de fotografias; dicho enlace se oculta al supervisor para evitar exposicion transversal.
+- El modo demostracion incorpora un perfil supervisor de Equipo 1 (`5678901`, PIN de demostracion `1234`) y datos de otro equipo para comprobar aislamiento.
+- Version de frontend, backend y cache PWA incrementada a `1.6.0`; el esquema de hojas permanece en `2026-08-01.2` porque no se agregaron columnas.
+
+### Validacion
+
+- Pruebas nuevas de ayuda contextual y alcance del supervisor en escuelas, tablero, lista de integrantes y logistica.
+- Prueba del backend para acceso a escuela, bootstrap, registros y fotografias limitada al equipo.
+- Suite Playwright completa: 54 pruebas aprobadas en Chrome de escritorio y movil; regresion final de ayuda y captura fotografica: 6 pruebas aprobadas.
+- Sintaxis aprobada en los 18 archivos JavaScript del frontend y backend; `git diff --check` sin errores.
+- La suite se ejecuta en una copia temporal local porque la unidad sincronizada materializa archivos vacios dentro de `node_modules`.
+- El commit y push fueron solicitados para esta intervencion. El despliegue del backend Apps Script no forma parte del alcance autorizado y debe realizarse por separado para activar sus controles del lado servidor.
+
+## 2026-08-01 - Compatibilidad bidireccional de codigos v1.5.1
+
+### Objetivo
+
+Permitir que la appweb reciba el codigo interno de CIALPA o el codigo de establecimiento RUE sin duplicar escuelas, asignaciones, registros, fotografias ni indicadores.
+
+### Implementado
+
+- Busqueda y seleccion por codigo interno, codigo RUE de siete digitos o variantes con separadores.
+- Normalizacion de asignaciones, progreso, registros remotos, borradores e identificadores al codigo interno canonico de la app.
+- Validacion del backend por cualquiera de los dos codigos antes de guardar registros, fotografias o asignaciones.
+- Incorporacion de `codigo_rue` y `sitio_id` en `FOTOS`, ademas de los campos ya previstos en `ESCUELAS` y `REGISTROS`.
+- Migracion idempotente para completar codigos compatibles en registros y fotografias existentes, y eliminacion de filas duplicadas del catalogo que solo difieran por ceros iniciales.
+- KPI y progreso por escuela consolidados para que un alias RUE no se cuente como una escuela adicional.
+- La interfaz muestra juntas las referencias **RUE** e **Interno** en escuelas, registro, siguiente visita y logistica.
+- Version local de frontend, backend, esquema y cache PWA incrementada a `1.5.1` / `2026-08-01.2`.
+
+### Estado
+
+- Cambios preparados localmente; no se realizo publicacion ni despliegue del backend en esta intervencion.
+- Sintaxis aprobada en 18 archivos JavaScript; catalogo y archivos JSON validos; `git diff --check` sin errores.
+- Catalogo conciliado: 86 codigos internos, 86 codigos RUE unicos, 85 sitios fisicos, cero codigos RUE invalidos y cero colisiones de alias.
+- Suite Playwright completa: 48 pruebas aprobadas en Chrome de escritorio y movil. Incluye busqueda por ambos codigos, normalizador del backend, manifiesto RUE, edicion, mapa, offline, KPI, logistica y puente GAS.
+
+## 2026-08-01 - Contrato de compatibilidad RUE–CIALPA v1.5.0
+
+### Objetivo
+
+Estandarizar la relacion entre los registros fotograficos de la app y el modulo de Relevamiento de Infraestructura de RUE, sin duplicar el cuestionario ni automatizar accesos o escrituras no autorizadas.
+
+### Diagnostico
+
+- RUE presenta el codigo del establecimiento con siete digitos; la app conservaba algunos codigos de Capital sin ceros iniciales.
+- El operativo contiene 86 codigos institucionales en 85 sedes fisicas. Los codigos `1108034` y `1108042` corresponden a la misma construccion.
+- RUE organiza la ficha en General, Bloques y Plantas, Areas de Recreacion, Aula, Dependencias, Laboratorio/Taller y Sanitarios; la app usa tipos de espacio y claves `B/P/E/H`.
+- La pantalla publica de ingreso de RUE exige sesion y CAPTCHA. No existe en el proyecto una API documentada ni una plantilla oficial de importacion autorizada.
+
+### Implementado
+
+- El catalogo version 2 agrega `codigoRue`, `sitioId`, codigos que comparten sede y conteo de 85 sitios fisicos.
+- La app muestra y permite buscar los codigos RUE de siete digitos sin modificar las claves historicas de los registros.
+- Los nuevos registros guardan codigo RUE, sitio fisico, seccion RUE y clave equivalente de bloque, planta y espacio.
+- **Control > Conciliar con RUE** genera un manifiesto CSV UTF-8 con una fila por evidencia y conserva tambien registros sin fotografias.
+- La exportacion incluye metadatos, GPS, fechas, URL privada, SHA-256 y un estado explicito de compatibilidad.
+- La conciliacion detecta dos registros diferentes que apunten al mismo espacio RUE y los marca como `ESPACIO_RUE_DUPLICADO`.
+- El backend agrega columnas de interoperabilidad de forma migrable al final de `ESCUELAS` y `REGISTROS`.
+- Se documentaron la matriz, sus limites y los nuevos campos en `docs/COMPATIBILIDAD_RUE_CIALPA.md` y `docs/DICCIONARIO_DATOS.md`.
+- Version de frontend, backend y cache PWA incrementadas a `1.5.0`; esquema de hojas a `2026-08-01.1`.
+
+### Estado de validacion
+
+- Sintaxis JavaScript, Python, JSON y revision de whitespace aprobadas.
+- Suite Playwright completa: 46 pruebas aprobadas en Chrome de escritorio y movil.
+- Regresion especifica posterior para manifiesto, claves RUE y deteccion de duplicados: 4 pruebas aprobadas.
+- Auditoria de dependencias de produccion: 0 vulnerabilidades. `npm ci` informa dos vulnerabilidades altas solamente en dependencias de desarrollo.
+- No se realizo escritura, carga, despliegue ni modificacion dentro de RUE.
+- La publicacion de la app y la actualizacion del backend permanecen pendientes de autorizacion. Al cierre, GitHub Pages responde HTTP 200 con frontend/cache `1.4.1` y el backend publicado responde correctamente con version `1.4.0`, esquema `2026-07-25.2`.
+
+## 2026-08-01 - Edicion visible de registros guardados v1.4.2
+
+### Objetivo
+
+Restituir una accion visible y comprensible para editar registros propios ya sincronizados desde **Mi jornada**, incluyendo compatibilidad con registros antiguos.
+
+### Implementado
+
+- El boton de los registros propios se denomina **Editar** y abre el formulario con el encabezado **Editar registro**.
+- La comparacion del codigo de censista normaliza numeros, texto y espacios para evitar que el boton desaparezca por diferencias de formato.
+- Si un registro antiguo no posee `recordKey`, la app reconstruye la clave con el codigo normalizado del censista y el identificador del registro.
+- Las fotografias sincronizadas se recuperan con la misma clave reconstruida y la proxima evidencia conserva la secuencia siguiente.
+- Los registros visibles del otro integrante del equipo muestran **Solo lectura** en lugar de una ausencia ambigua de acciones.
+- Version de frontend y cache PWA incrementadas a `1.4.2`.
+
+### Validacion local
+
+- Sintaxis JavaScript y archivos JSON aprobados.
+- Pruebas de regresion en Chrome de escritorio y movil: edicion de registro sincronizado y recuperacion de registro antiguo con codigo numerico y sin `recordKey`.
+- La publicacion permanece pendiente de autorizacion; la URL publica continua en `1.4.1` hasta realizar commit, push y verificar GitHub Pages.
+
 ## 2026-07-30 - Centrado estable de escuelas v1.4.1
 
 ### Objetivo

@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/?demo=1');
@@ -11,9 +12,32 @@ test.beforeEach(async ({ page }) => {
 
 test('muestra las 86 escuelas piloto y permite filtrar', async ({ page }) => {
   await expect(page.locator('[data-action="select-school"]')).toHaveCount(86);
-  await page.getByPlaceholder('Codigo, escuela, distrito...').fill('11007');
+  await page.getByPlaceholder('Codigo RUE o interno, escuela, distrito...').fill('11007');
   await expect(page.locator('[data-action="select-school"]')).toHaveCount(1);
   await expect(page.getByText('COLEGIO NACIONAL DE E.M.D. PRESIDENTE FRANCO')).toBeVisible();
+  await page.getByPlaceholder('Codigo RUE o interno, escuela, distrito...').fill('0011007');
+  await expect(page.locator('[data-action="select-school"]')).toHaveCount(1);
+  await expect(page.locator('[data-action="select-school"] small')).toContainText('RUE 0011007');
+
+  const sharedSite = await page.evaluate(async () => {
+    const catalog = await fetch('./assets/data/pilot-schools.json').then((response) => response.json());
+    const first = catalog.schools.find((school) => school.codigo === '1108034');
+    const second = catalog.schools.find((school) => school.codigo === '1108042');
+    return {
+      schemaVersion: catalog.schemaVersion,
+      physicalSites: catalog.physicalSites,
+      firstSite: first.sitioId,
+      secondSite: second.sitioId,
+      sharedCodes: first.codigosRueSitio
+    };
+  });
+  expect(sharedSite).toEqual({
+    schemaVersion: 2,
+    physicalSites: 85,
+    firstSite: 'CIALPA-S051',
+    secondSite: 'CIALPA-S051',
+    sharedCodes: ['1108034', '1108042']
+  });
 });
 
 test('centra el mapa al seleccionar una escuela desde la lista', async ({ page }) => {
@@ -117,7 +141,7 @@ test('activa la camara y agrega el identificador al pie de la imagen', async ({ 
   expect(image.pixel[2]).toBeGreaterThan(75);
 });
 
-test('reabre un registro sincronizado y continua la secuencia fotografica', async ({ page }) => {
+test('edita un registro sincronizado y continua la secuencia fotografica', async ({ page }) => {
   await page.locator('[data-action="select-school"]').first().click();
   await page.locator('[data-action="start-record"]').click();
   await page.locator('input[data-photo-input="EVIDENCIA"]').setInputFiles({
@@ -128,11 +152,39 @@ test('reabre un registro sincronizado y continua la secuencia fotografica', asyn
   await page.getByRole('button', { name: /Finalizar y sincronizar/ }).click();
   await expect(page.getByRole('heading', { name: 'Mi jornada' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Registros sincronizados', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Continuar' })).toBeVisible();
-  await page.getByRole('button', { name: 'Continuar' }).click();
-  await expect(page.getByRole('heading', { name: 'Continuar registro' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible();
+  await page.getByRole('button', { name: 'Editar' }).click();
+  await expect(page.getByRole('heading', { name: 'Editar registro' })).toBeVisible();
   await expect(page.locator('.photo-item.is-synced')).toHaveCount(1);
   await expect(page.locator('.photo-id-preview')).toContainText(/-AM01-FT02/);
+});
+
+test('muestra Editar para un registro antiguo con codigo numerico y sin recordKey', async ({ page }) => {
+  await page.locator('[data-action="select-school"]').first().click();
+  await page.locator('[data-action="start-record"]').click();
+  await page.locator('input[data-photo-input="EVIDENCIA"]').setInputFiles({
+    name: 'registro-antiguo.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#edf3f8"/></svg>')
+  });
+  await page.getByRole('button', { name: /Finalizar y sincronizar/ }).click();
+  await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible();
+
+  await page.evaluate(() => {
+    const key = 'cialpa-fotos-demo-data-v1';
+    const data = JSON.parse(localStorage.getItem(key));
+    data.records[0].codigoCensista = Number(data.records[0].codigoCensista);
+    delete data.records[0].recordKey;
+    localStorage.setItem(key, JSON.stringify(data));
+    localStorage.removeItem('cialpa-fotos-records-cache-v1');
+  });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Escuelas asignadas' })).toBeVisible();
+  await page.locator('[data-view="pending"]:visible').first().click();
+  await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible();
+  await page.getByRole('button', { name: 'Editar' }).click();
+  await expect(page.getByRole('heading', { name: 'Editar registro' })).toBeVisible();
+  await expect(page.locator('.photo-item.is-synced')).toHaveCount(1);
 });
 
 test('controla GPS al finalizar y explicacion de pendientes', async ({ page }) => {
@@ -162,6 +214,32 @@ test('expone control administrativo y resumen por censista', async ({ page }) =>
   await expect(page.getByRole('heading', { name: 'Resumen general' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Avance por censista' })).toBeVisible();
   await expect(page.locator('.operations-tab.is-active')).toContainText('Resumen');
+  await expect(page.getByRole('heading', { name: 'Compatibilidad RUE' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Conciliar con RUE' })).toBeVisible();
+});
+
+test('genera un manifiesto de conciliacion RUE con sede, espacio y evidencia', async ({ page }) => {
+  await page.locator('[data-action="select-school"]').first().click();
+  await page.locator('[data-action="start-record"]').click();
+  await page.locator('input[data-photo-input="EVIDENCIA"]').setInputFiles({
+    name: 'compatibilidad-rue.svg',
+    mimeType: 'image/svg+xml',
+    buffer: Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360"><rect width="640" height="360" fill="#dbe8ef"/></svg>')
+  });
+  await page.getByRole('button', { name: /Finalizar y sincronizar/ }).click();
+  await expect(page.getByRole('heading', { name: 'Mi jornada' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Control' }).click();
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Conciliar con RUE' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/^cialpa-compatibilidad-rue-\d{4}-\d{2}-\d{2}\.csv$/);
+  const content = fs.readFileSync(await download.path(), 'utf8');
+  expect(content).toContain('"contrato_version";"codigo_establecimiento_rue"');
+  expect(content).toContain('"RUE-CIALPA-1.0";"0011007";"11007"');
+  expect(content).toContain('"CIALPA-S001"');
+  expect(content).toContain('"AULA"');
+  expect(content).toContain('"COMPATIBLE"');
 });
 
 test('administra encuestadores y conserva la cuenta principal protegida', async ({ page }) => {
@@ -229,7 +307,7 @@ test('conserva la ficha offline y la sincroniza al recuperar conexion', async ({
   await context.setOffline(false);
   await expect(page.getByText('Todo esta sincronizado.')).toBeVisible({ timeout: 10000 });
   await expect(page.locator('.queue-list .list-card')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Continuar' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible();
 });
 
 test('recupera un borrador despues de cerrar o recargar la app', async ({ page }) => {

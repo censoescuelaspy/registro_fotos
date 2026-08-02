@@ -23,20 +23,74 @@ function activeAssignmentsFor_(code) {
   });
 }
 
+function canonicalRueCode_(value) {
+  const code = String(value == null ? '' : value).replace(/\D/g, '');
+  return code ? code.padStart(7, '0') : '';
+}
+
+function schoolByAnyCode_(schoolCode, catalog) {
+  const requested = String(schoolCode == null ? '' : schoolCode).replace(/\D/g, '');
+  if (!requested) return null;
+  const requestedRue = canonicalRueCode_(requested);
+  return (catalog || objects_(SHEETS.SCHOOLS)).filter(function (school) {
+    const appCode = String(school.codigo || '').replace(/\D/g, '');
+    const rueCode = canonicalRueCode_(school.codigo_rue || school.codigoRue || appCode);
+    return appCode === requested || rueCode === requestedRue;
+  })[0] || null;
+}
+
+function canonicalAppSchoolCode_(schoolCode, catalog) {
+  const school = schoolByAnyCode_(schoolCode, catalog);
+  return school ? String(school.codigo || '') : '';
+}
+
 function canAccessSchool_(session, schoolCode) {
-  if ([ROLE.ADMIN, ROLE.SUPERVISOR].indexOf(session.rol) >= 0) return true;
+  if (session.rol === ROLE.ADMIN) return true;
+  const catalog = objects_(SHEETS.SCHOOLS);
+  const canonical = canonicalAppSchoolCode_(schoolCode, catalog);
+  if (!canonical) return false;
   return activeAssignmentsFor_(session.codigoCensista).some(function (assignment) {
-    return String(assignment.codigo_escuela) === String(schoolCode);
+    return canonicalAppSchoolCode_(assignment.codigo_escuela, catalog) === canonical;
   });
 }
 
 function requireSchoolAccess_(session, schoolCode) {
-  if (!objects_(SHEETS.SCHOOLS).some(function (school) { return String(school.codigo) === String(schoolCode); })) {
+  const school = schoolByAnyCode_(schoolCode);
+  if (!school) {
     throw apiError_('SCHOOL_NOT_FOUND', 'La escuela no existe en el catalogo vigente.');
   }
-  if (!canAccessSchool_(session, schoolCode)) {
-    throw apiError_('FORBIDDEN', 'La escuela no esta asignada a este censista.');
+  if (!canAccessSchool_(session, school.codigo)) {
+    throw apiError_('FORBIDDEN', 'La escuela no esta asignada a este usuario ni a su equipo.');
   }
+  return school;
+}
+
+function rueSectionForSpace_(value) {
+  const sections = {
+    PLANTA_GENERAL: 'BLOQUES_Y_PLANTAS',
+    AULA: 'AULA',
+    LABORATORIO: 'LABORATORIO_TALLER',
+    TALLER: 'LABORATORIO_TALLER',
+    SANITARIO: 'SANITARIO',
+    EXTERIOR: 'AREA_RECREACION',
+    ADMINISTRACION: 'DEPENDENCIA',
+    BIBLIOTECA: 'DEPENDENCIA',
+    COCINA_COMEDOR: 'DEPENDENCIA',
+    DEPOSITO: 'DEPENDENCIA',
+    PASILLO: 'DEPENDENCIA',
+    OTRO: 'DEPENDENCIA'
+  };
+  return sections[String(value || '').toUpperCase()] || '';
+}
+
+function rueFloorLabel_(value) {
+  const floor = String(value == null ? '' : value).replace(/\D/g, '');
+  return !floor || Number(floor) === 0 ? 'PLANTA_BAJA' : 'NIVEL_' + floor.padStart(2, '0');
+}
+
+function rueSpaceKey_(rueCode, section, block, floor, space) {
+  return 'RUE:' + rueCode + ':' + section + ':B' + String(block).padStart(2, '0')
+    + ':' + rueFloorLabel_(floor) + ':E' + String(space).padStart(3, '0');
 }
 
 function recordView_(row) {
@@ -44,6 +98,8 @@ function recordView_(row) {
     recordKey: String(row.record_key || ''),
     recordId: String(row.record_id || ''),
     codigoEscuela: String(row.codigo_escuela || ''),
+    codigoRue: String(row.codigo_rue || canonicalRueCode_(row.codigo_escuela)),
+    sitioId: String(row.sitio_id || ''),
     codigoCensista: String(row.codigo_censista || ''),
     numeroFormulario: String(row.numero_formulario || ''),
     numeroHoja: String(row.numero_hoja || ''),
@@ -54,6 +110,11 @@ function recordView_(row) {
     estado: String(row.estado || ''),
     observaciones: String(row.observaciones || ''),
     danosFallas: String(row.danos_fallas || ''),
+    rueSection: String(row.rue_seccion || rueSectionForSpace_(row.tipo_espacio)),
+    rueSpaceKey: String(row.rue_clave_espacio || ''),
+    latitudCaptura: row.latitud_captura === '' ? '' : Number(row.latitud_captura),
+    longitudCaptura: row.longitud_captura === '' ? '' : Number(row.longitud_captura),
+    precisionM: row.precision_m === '' ? '' : Number(row.precision_m),
     cantidadFotos: Number(row.cantidad_fotos || 0),
     cantidadHojasPapel: Number(row.cantidad_hojas_papel || 0),
     createdAt: row.created_at || '',
@@ -71,6 +132,8 @@ function photoView_(row) {
     recordKey: String(row.record_key || ''),
     recordId: String(row.record_id || ''),
     codigoEscuela: String(row.codigo_escuela || ''),
+    codigoRue: String(row.codigo_rue || canonicalRueCode_(row.codigo_escuela)),
+    sitioId: String(row.sitio_id || ''),
     codigoCensista: String(row.codigo_censista || ''),
     tipoFoto: String(row.tipo_foto || ''),
     tipoElemento: String(row.tipo_elemento || ''),
@@ -85,6 +148,9 @@ function photoView_(row) {
     sha256: String(row.sha256 || ''),
     driveUrl: String(row.drive_url || ''),
     thumbnailUrl: String(row.thumbnail_url || ''),
+    latitud: row.latitud === '' ? '' : Number(row.latitud),
+    longitud: row.longitud === '' ? '' : Number(row.longitud),
+    precisionM: row.precision_m === '' ? '' : Number(row.precision_m),
     capturedAt: row.captured_at || '',
     uploadedAt: row.uploaded_at || '',
     estado: String(row.estado || ''),
@@ -94,14 +160,15 @@ function photoView_(row) {
 
 function bootstrap_(session) {
   const assignments = activeAssignmentsFor_(session.codigoCensista);
-  const showAll = [ROLE.ADMIN, ROLE.SUPERVISOR].indexOf(session.rol) >= 0;
+  const showAll = session.rol === ROLE.ADMIN;
   const teamCodes = activeTeamMemberCodes_(session.codigoCensista);
+  const schoolCatalog = objects_(SHEETS.SCHOOLS);
   const records = objects_(SHEETS.RECORDS).filter(function (row) {
     return showAll || teamCodes[String(row.codigo_censista)];
   });
   const progress = {};
   records.forEach(function (record) {
-    const code = String(record.codigo_escuela);
+    const code = canonicalAppSchoolCode_(record.codigo_escuela, schoolCatalog) || String(record.codigo_escuela);
     if (!progress[code]) progress[code] = { registros: 0, fotos: 0, estado: 'PENDIENTE' };
     progress[code].registros += 1;
     progress[code].fotos += Number(record.cantidad_fotos || 0);
@@ -112,7 +179,9 @@ function bootstrap_(session) {
   });
   return {
     user: publicUser_(session.user),
-    assignedCodes: assignments.map(function (item) { return String(item.codigo_escuela); })
+    assignedCodes: assignments.map(function (item) {
+      return canonicalAppSchoolCode_(item.codigo_escuela, schoolCatalog) || String(item.codigo_escuela);
+    })
       .filter(function (code, index, items) { return items.indexOf(code) === index; }),
     showAllSchools: showAll,
     progress: progress,
@@ -124,8 +193,9 @@ function bootstrap_(session) {
 }
 
 function validateRecord_(input, session) {
-  const code = digits_(input.codigoEscuela, 'codigo de escuela', 3, 12);
-  requireSchoolAccess_(session, code);
+  const requestedCode = digits_(input.codigoEscuela, 'codigo de escuela', 3, 12);
+  const school = requireSchoolAccess_(session, requestedCode);
+  const code = String(school.codigo || '');
   const block = digits_(input.bloque, 'bloque', 1, 3);
   const floor = digits_(input.piso, 'piso', 1, 2);
   const space = digits_(input.espacio, 'espacio', 1, 4);
@@ -137,6 +207,10 @@ function validateRecord_(input, session) {
   }
   const status = requireIn_(input.estado, RECORD_STATUS, 'estado');
   const idempotency = text_(input.idempotencyKey, 'clave de idempotencia', 80, true);
+  const spaceType = text_(input.tipoEspacio, 'tipo de espacio', 80, true).toUpperCase();
+  const rueCode = String(school.codigo_rue || canonicalRueCode_(code));
+  const rueSection = rueSectionForSpace_(spaceType);
+  if (!rueSection) throw apiError_('VALIDATION_ERROR', 'El tipo de espacio no tiene equivalencia RUE.');
   return {
     record_key: session.codigoCensista + ':' + expectedId,
     record_id: expectedId,
@@ -148,7 +222,7 @@ function validateRecord_(input, session) {
     bloque: block,
     piso: floor,
     espacio: space,
-    tipo_espacio: text_(input.tipoEspacio, 'tipo de espacio', 80, true).toUpperCase(),
+    tipo_espacio: spaceType,
     estado: status,
     observaciones: text_(input.observaciones, 'observaciones', 1000, false),
     danos_fallas: text_(input.danosFallas, 'danos y fallas', 1000, false),
@@ -163,7 +237,11 @@ function validateRecord_(input, session) {
     device_id: text_(input.deviceId, 'dispositivo', 100, false),
     started_at: text_(input.startedAt, 'inicio', 40, false),
     completed_at: text_(input.completedAt, 'finalizacion', 40, false),
-    duration_seconds: number_(input.durationSeconds, 'duracion', 0, 604800, false)
+    duration_seconds: number_(input.durationSeconds, 'duracion', 0, 604800, false),
+    codigo_rue: rueCode,
+    sitio_id: String(school.sitio_id || ''),
+    rue_seccion: rueSection,
+    rue_clave_espacio: rueSpaceKey_(rueCode, rueSection, block, floor, space)
   };
 }
 
@@ -198,8 +276,9 @@ function getOrCreateFolder_(parent, name) {
 }
 
 function validatePhoto_(input, session) {
-  const school = digits_(input.codigoEscuela, 'codigo de escuela', 3, 12);
-  requireSchoolAccess_(session, school);
+  const requestedCode = digits_(input.codigoEscuela, 'codigo de escuela', 3, 12);
+  const schoolRow = requireSchoolAccess_(session, requestedCode);
+  const school = String(schoolRow.codigo || '');
   const recordId = text_(input.recordId, 'identificador de registro', 160, true);
   const recordKey = session.codigoCensista + ':' + recordId;
   const record = objects_(SHEETS.RECORDS).filter(function (row) { return String(row.record_key) === recordKey; })[0];
@@ -254,7 +333,9 @@ function validatePhoto_(input, session) {
     longitud: input.location ? number_(input.location.longitud, 'longitud', -180, 180, true) : '',
     precision_m: input.location ? number_(input.location.precisionM, 'precision', 0, 100000, true) : '',
     captured_at: text_(input.capturedAt, 'fecha de captura', 40, false),
-    notas: text_(input.notas, 'notas', 500, false)
+    notas: text_(input.notas, 'notas', 500, false),
+    codigo_rue: String(record.codigo_rue || schoolRow.codigo_rue || canonicalRueCode_(school)),
+    sitio_id: String(record.sitio_id || schoolRow.sitio_id || '')
   };
 }
 
@@ -290,6 +371,8 @@ function uploadPhoto_(input, base64, session, client) {
     codigoFoto: photo.codigo_foto,
     recordId: photo.record_id,
     codigoEscuela: photo.codigo_escuela,
+    codigoRue: photo.codigo_rue,
+    sitioId: photo.sitio_id,
     codigoCensista: photo.codigo_censista,
     bloque: photo.bloque,
     piso: photo.piso,
@@ -337,16 +420,23 @@ function syncRecordPhotoCounts_(recordKey) {
 }
 
 function listRecords_(payload, session) {
-  const showAll = [ROLE.ADMIN, ROLE.SUPERVISOR].indexOf(session.rol) >= 0;
-  const schoolFilter = payload && payload.codigoEscuela ? String(payload.codigoEscuela) : '';
+  const showAll = session.rol === ROLE.ADMIN;
+  const schoolCatalog = objects_(SHEETS.SCHOOLS);
+  const requestedSchoolFilter = payload && payload.codigoEscuela ? String(payload.codigoEscuela) : '';
+  const schoolFilterRow = requestedSchoolFilter ? schoolByAnyCode_(requestedSchoolFilter, schoolCatalog) : null;
+  if (requestedSchoolFilter && !schoolFilterRow) {
+    throw apiError_('SCHOOL_NOT_FOUND', 'La escuela no existe en el catalogo vigente.');
+  }
+  const schoolFilter = schoolFilterRow ? String(schoolFilterRow.codigo || '') : '';
   const requestedSurveyor = payload && payload.codigoCensista ? digits_(payload.codigoCensista, 'codigo de censista', 5, 12) : '';
   const surveyorFilter = requestedSurveyor && showAll ? requestedSurveyor : (showAll ? '' : session.codigoCensista);
   const teamCodes = showAll ? {} : activeTeamMemberCodes_(session.codigoCensista);
   const records = objects_(SHEETS.RECORDS).filter(function (row) {
+    const rowSchoolCode = canonicalAppSchoolCode_(row.codigo_escuela, schoolCatalog) || String(row.codigo_escuela);
     return (!surveyorFilter || (showAll
       ? String(row.codigo_censista) === surveyorFilter
       : teamCodes[String(row.codigo_censista)]))
-      && (!schoolFilter || String(row.codigo_escuela) === schoolFilter);
+      && (!schoolFilter || rowSchoolCode === schoolFilter);
   });
   const keys = {};
   records.forEach(function (row) { keys[String(row.record_key)] = true; });

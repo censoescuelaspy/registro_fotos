@@ -24,7 +24,7 @@ export function filterLogisticsSchools(schools, progress, assignmentMap, filters
   return schools.filter((school) => {
     const status = schoolStatus(progress, school.codigo);
     const surveyor = String(assignmentMap?.[school.codigo] || '');
-    const haystack = `${school.codigo} ${school.nombre} ${school.departamento} ${school.distrito} ${school.localidad}`
+    const haystack = `${school.codigo} ${school.codigoRue || ''} ${school.sitioId || ''} ${(school.codigosRueSitio || []).join(' ')} ${school.nombre} ${school.departamento} ${school.distrito} ${school.localidad}`
       .toLocaleLowerCase('es');
     return (!search || haystack.includes(search))
       && (!filters.department || school.departamento === filters.department)
@@ -130,14 +130,16 @@ export function logisticsMetrics(schools, users, assignmentMap, progress, settin
 export function logisticsCsv(schools, users, assignmentMap, progress) {
   const userByCode = new Map(users.map((user) => [String(user.codigoCensista), user]));
   const rows = [[
-    'codigo_escuela', 'escuela', 'departamento', 'distrito', 'localidad', 'estado',
+    'codigo_escuela_app', 'codigo_establecimiento_rue', 'sitio_fisico_cialpa',
+    'sede_compartida', 'escuela', 'departamento', 'distrito', 'localidad', 'estado',
     'codigo_representante', 'equipo_y_censistas', 'latitud', 'longitud'
   ]];
   schools.forEach((school) => {
     const code = String(assignmentMap?.[school.codigo] || '');
     const user = userByCode.get(code);
     rows.push([
-      school.codigo, school.nombre, school.departamento, school.distrito, school.localidad,
+      school.codigo, school.codigoRue || String(school.codigo || '').padStart(7, '0'), school.sitioId || '',
+      school.sedeCompartida ? 'SI' : 'NO', school.nombre, school.departamento, school.distrito, school.localidad,
       schoolStatus(progress, school.codigo), code,
       user ? `${user.nombres} ${user.apellidos}`.trim() : '', school.latitud, school.longitud
     ]);

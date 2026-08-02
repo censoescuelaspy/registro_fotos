@@ -24,6 +24,12 @@
 - Pruebas de actualizacion en escritorio y Pixel 7 simulado: version visible, boton manual, invalidacion de cache anterior, navegacion automatica, limpieza de URL y aviso posterior aprobados.
 - Regresion funcional: `66/66` pruebas generales aprobadas; ensayo intensivo separado `2/2`, con 300/300 fotos nuevamente abiertas en ambos perfiles (`68/68` en total).
 
+### Publicacion
+
+- Frontend publicado desde el commit `c28e27b`; los dos workflows de GitHub Pages finalizaron correctamente.
+- Backend productivo actualizado al deployment inmutable `@24`; `health` responde version `1.7.3`, esquema `2026-08-01.2` y `bootstrapRequired: false`.
+- Smoke test en la URL publica aprobado en Chrome escritorio y Pixel 7 simulado: version `1.7.3`, boton **Actualizar**, `version.json` y service worker activo verificados.
+
 ## 2026-08-02 - Escuela ficticia y ensayo de 300 fotografias v1.7.2
 
 ### Alcance

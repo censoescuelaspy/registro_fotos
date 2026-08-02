@@ -1,5 +1,31 @@
 # Bitacora
 
+## 2026-08-02 - Backend Apps Script v1.6.0 desplegado en produccion
+
+### Objetivo
+
+Activar en el endpoint productivo existente los controles de compatibilidad RUE, ayuda operativa y alcance seguro del supervisor que ya estaban publicados en el frontend 1.6.0.
+
+### Despliegue
+
+- Verificacion previa: la URL productiva respondia backend `1.4.0` y esquema `2026-07-25.2`.
+- Identidad `clasp` confirmada: `dmeza.py@gmail.com`, con acceso al proyecto vinculado por `.clasp.json`.
+- `clasp push -f` subio los nueve archivos del backend Apps Script.
+- Se creo la version inmutable `17` con la descripcion `CIALPA Fotos v1.6.0 - ayudas contextuales, RUE y supervision por equipo`.
+- El deployment `AKfycbz8RmR-TqSb3FzaLSgMO2NlTTOfRPWuYjSC5ZyXw1Vr5iL-PBYeDIerNvCVj--hNjYk` se actualizo de `@16` a `@17`, conservando exactamente la misma URL `/exec` configurada en el frontend.
+
+### Verificacion productiva
+
+- `GET` y `POST health` sobre la URL exacta respondieron HTTP `200`, servicio `CIALPA Fotos`, version `1.6.0`, esquema `2026-08-01.2` y `bootstrapRequired: false`.
+- La inicializacion automatica `ensureSystem_()` finalizo correctamente antes de responder y aplico la actualizacion idempotente del esquema y del catalogo.
+- Una solicitud anonima a `adminDashboard` fue rechazada con `AUTH_REQUIRED`, confirmando que el modulo operativo sigue protegido por sesion.
+- Desde `https://censoescuelaspy.github.io/registro_fotos/`, el transporte real por iframe y `postMessage` consulto el endpoint productivo y recibio `1.6.0 / 2026-08-01.2` sin errores de pagina.
+- La misma fuente desplegada aprobo previamente `54/54` pruebas Playwright en escritorio y movil, incluidas ayuda contextual, aislamiento de escuelas, integrantes, registros y fotografias del supervisor por equipo.
+
+### Limite de la prueba
+
+- No se utilizo el PIN de ningun usuario de campo para una prueba autenticada en produccion. El alcance del supervisor fue validado con pruebas automatizadas de frontend y backend, mientras que en produccion se comprobaron version, migracion, transporte y rechazo de acceso anonimo.
+
 ## 2026-08-01 - Ayuda contextual y alcance seguro del supervisor v1.6.0
 
 ### Objetivo

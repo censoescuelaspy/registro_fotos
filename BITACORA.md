@@ -23,6 +23,12 @@
 - En la ejecucion integral concurrente, las 300/300 imagenes volvieron a abrirse sin error: 39.426 ms en escritorio y 37.439 ms en Pixel 7 simulado.
 - Sintaxis JavaScript y `git diff --check` sin errores.
 
+### Publicacion
+
+- Frontend publicado en GitHub Pages desde el commit `6eb0bdb`; ambos workflows de Pages finalizaron correctamente.
+- Backend publicado en el deployment productivo como version inmutable `22`; la accion `health` confirma `version: 1.7.2` y el esquema vigente.
+- Smoke test contra la URL publica: 87 escuelas, 75 registros y 300/300 fotografias abiertas sin error; metadatos en 1.823 ms y recorrido en 33.762 ms.
+
 ## 2026-08-02 - Correccion del transporte fotografico v1.7.1
 
 ### Diagnostico

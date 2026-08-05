@@ -581,6 +581,103 @@ Crear una PWA separada para capturar y organizar fotografias del piloto CIALPA, 
 
 La hoja y la carpeta de fotos deben ser privadas. Debe eliminarse cualquier permiso de edicion abierto por enlace antes del uso operativo.
 
+## 2026-08-05 09:15 -03 - Gestion reversible de equipos y asignaciones v1.9.0
+
+### Proyecto
+
+- Nombre: CIALPA Fotos - Registro de campo.
+- Ruta local de trabajo: `/tmp/registro_fotos_audit.hHPCPU/repo` (clon limpio del repositorio productivo).
+- Repositorio: `https://github.com/censoescuelaspy/registro_fotos.git`.
+- URL publica: `https://censoescuelaspy.github.io/registro_fotos/`.
+- Responsable tecnico: Codex, por solicitud del usuario.
+- Version: aplicacion `1.9.0`; esquema `2026-08-05.1`.
+
+### Objetivo de la intervencion
+
+- Incorporar activacion e inactivacion explicita de asignaciones sin eliminar historial.
+- Permitir que administradores y coordinadores creen equipos, asignen integrantes y distribuyan escuelas dentro de su ambito.
+- Dejar activas unicamente las ocho asignaciones indicadas en la imagen suministrada.
+
+### Diagnostico inicial
+
+- La operacion dependia del campo legado `USUARIOS.equipo` y no existia una entidad normalizada para equipos y membresias.
+- La pantalla logistica permitia reasignar, pero no expresaba de manera directa la activacion o inactivacion conservando el historial.
+- Existian asignaciones previas y duplicadas que no debian eliminarse.
+- Dahiana Ramond e Ivan Garcia figuran como coordinadores en la imagen, pero no tienen cuenta/codigo localizable en la base operativa.
+
+### Acciones realizadas
+
+- Se agregaron las hojas normalizadas `EQUIPOS` y `EQUIPO_MIEMBROS` y el campo `equipo_id` al final de `ASIGNACIONES` y `REGISTROS`.
+- Se implemento migracion compatible con el campo legado, una membresia activa por encuestador y multiples equipos por coordinador.
+- Se agregaron controles para crear y editar equipos, guardar integrantes, activar o inactivar equipos y activar o inactivar asignaciones.
+- La desactivacion conserva las filas historicas; al inactivar un equipo tambien se inactivan sus asignaciones activas.
+- Se generaron tres hojas ocultas de resguardo antes de modificar datos: `backup_asignaciones_pre_gestion_equipos_20260805_0852`, `backup_usuarios_pre_gestion_equipos_20260805_0852` y `backup_registros_pre_gestion_equipos_20260805_0852`.
+- Se conservaron todas las asignaciones existentes como historial inactivo y quedaron exactamente ocho activas, una por cada escuela de la imagen.
+- Se configuraron ocho equipos activos con dos integrantes activos por equipo.
+- Licet Armoa y Belen Quinonez quedaron habilitadas con rol coordinador; los equipos de Dahiana Ramond e Ivan Garcia mantienen la referencia operativa en notas hasta que existan sus cuentas.
+- Se registro la intervencion en `AUDITORIA` con el evento `CIALPA-AUD-20260805-GESTION-EQUIPOS-01`.
+
+### Archivos modificados
+
+- Frontend: `assets/js/app.js`, `assets/js/api.js`, `assets/css/app.css`, configuracion de version y service worker.
+- Backend: `gas/Teams.js`, `gas/Admin.js`, `gas/Records.js`, `gas/Performance.js`, `gas/Sheets.js`, `gas/Config.js` y `gas/Code.js`.
+- Pruebas: suites de humo, permisos, RUE, actualizacion y visibilidad remota.
+- Documentacion: `README.md`, `docs/DICCIONARIO_DATOS.md`, `docs/MANUAL_OPERATIVO.md` y esta bitacora.
+
+### Comandos o scripts ejecutados
+
+- Validacion de sintaxis JavaScript y `git diff --check`.
+- `npm test` para la regresion completa en escritorio y movil.
+- `npx playwright test tests/rue.spec.js --project=desktop-chromium --project=mobile-chromium` para la logica GAS unitaria ajustada.
+- `npx clasp push -f`, creacion de version Apps Script y actualizacion del deployment productivo.
+- Lecturas y escrituras acotadas mediante Google Sheets API, con verificacion posterior de cada rango modificado.
+- Navegacion manual con Playwright CLI en la version local.
+
+### Resultados verificados
+
+- Suite completa: `80/80` pruebas aprobadas.
+- Verificacion en la hoja: 8 equipos activos, 16 membresias activas y 8 asignaciones activas; cada equipo tiene exactamente dos integrantes.
+- Historial previo preservado como inactivo y copias de resguardo ocultas confirmadas.
+- Interfaz local `1.9.0`: visibles `Crear equipo`, `Guardar integrantes`, `Activar` e `Inactivar`; sin errores de consola.
+- Backend productivo: version `1.9.0`, esquema `2026-08-05.1`, `bootstrapRequired: false`, deployment actualizado a `@27` sobre la misma URL.
+
+### Errores o incidentes
+
+- La primera suite termino con 76 pruebas aprobadas y cuatro fallas del arnes unitario, que aun no simulaba las nuevas dependencias de bloqueo y permisos. Se completo el arnes y la regresion final termino 80/80.
+- El wrapper de Playwright no tenia permiso de ejecucion directo; se ejecuto de forma explicita con `bash`.
+
+### Soluciones aplicadas
+
+- Modelo normalizado y auditable para evitar sobrescribir o eliminar asignaciones anteriores.
+- Escrituras productivas realizadas solo despues de copias de respaldo, con conteos y claves verificados tras la actualizacion.
+- Los coordinadores sin cuenta no fueron vinculados a una identidad incorrecta; sus nombres quedaron documentados como pendientes.
+
+### Pendientes
+
+- Crear o identificar las cuentas de Dahiana Ramond e Ivan Garcia y vincularlas como coordinadores de los equipos 1, 7 y 8.
+- Confirmar con el usuario la correspondencia de Villa Elisa: la imagen dice `Colegio Nacional San Jose`; el catalogo operativo disponible corresponde a `Escuela Basica N° 3537 San Jose`, codigo interno `1115012`.
+- Registrar el commit y la validacion de la URL publica en el cierre de despliegue.
+
+### Riesgos
+
+- Una identidad de coordinador incorrecta ampliaria acceso territorial; por eso las dos cuentas faltantes quedaron sin vincular.
+- Las filas historicas inactivas deben conservarse para auditoria y no deben depurarse manualmente.
+
+### Recomendaciones
+
+- Crear primero la cuenta del coordinador y luego asignarla desde Gestion de equipos.
+- Mantener las hojas de resguardo hasta la validacion de usuario y usar siempre activacion/inactivacion en lugar de borrar filas.
+- Incorporar al repositorio maestro el patron reutilizable de equipos, membresias y asignaciones temporales con historial.
+
+### Estado de validacion
+
+- Codigo compilado/sintaxis: aprobado.
+- Codigo probado: aprobado, 80/80.
+- Backend desplegado y verificado: aprobado, version 27.
+- Datos productivos actualizados y verificados: aprobado.
+- Frontend publico: pendiente del cierre de publicacion.
+- Validacion por usuario: pendiente.
+
 ## 2026-07-18 - Operacion y logistica v1.1.0
 
 ### Objetivo

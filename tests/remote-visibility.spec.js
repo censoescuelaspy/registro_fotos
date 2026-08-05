@@ -30,7 +30,7 @@ test('mantiene visible el error remoto y no lo presenta como una lista vacia', a
         }
       };
     } else {
-      payload = { ok: true, data: { service: 'CIALPA Fotos', version: '1.8.1', bootstrapRequired: false } };
+      payload = { ok: true, data: { service: 'CIALPA Fotos', version: '1.9.0', bootstrapRequired: false } };
     }
     await route.fulfill({
       status: 200,

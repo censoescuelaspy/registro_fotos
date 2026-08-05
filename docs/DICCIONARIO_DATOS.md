@@ -8,7 +8,9 @@
 | `USUARIOS` | Identidad, rol, hash salado del PIN y estado | `codigo_censista` |
 | `SESIONES` | Tokens hash y vencimiento | `token_hash` |
 | `ESCUELAS` | Catalogo piloto, coordenadas, codigo RUE y sede fisica | `codigo` |
-| `ASIGNACIONES` | Escuela autorizada por censista | `assignment_id` |
+| `EQUIPOS` | Equipo operativo, coordinador, estado y trazabilidad | `equipo_id` |
+| `EQUIPO_MIEMBROS` | Historial de pertenencia activa o inactiva de encuestadores | `membership_id` |
+| `ASIGNACIONES` | Historial de autorizacion de una escuela para un equipo | `assignment_id` |
 | `REGISTROS` | Una ficha por escuela, B/P/E/H y censista | `record_key` |
 | `FOTOS` | Metadatos y vinculo privado de cada imagen | `foto_id` |
 | `SOLICITUDES` | Altas pendientes de aprobacion | `solicitud_id` |
@@ -18,6 +20,9 @@
 
 - `record_id`: `ESCUELA-B##-P##-E###-H##`.
 - `record_key`: `codigo_censista:record_id`; evita mezclar fichas de usuarios distintos.
+- `equipo_id`: identificador estable del equipo; se guarda en equipos, membresias, asignaciones y registros para no depender de un nombre editable.
+- `membership_id`: identificador inmutable de una relacion encuestador-equipo. El campo `activo` cambia el estado sin borrar la fila.
+- `assignment_id`: identificador inmutable de una asignacion escuela-equipo. Solo una fila puede permanecer activa por escuela; las anteriores se conservan inactivas.
 - `codigo_rue`: codigo oficial normalizado a siete digitos, sin sustituir `codigo` ni `codigo_escuela`.
 - `sitio_id`: unidad fisica de visita `CIALPA-S###`; puede agrupar mas de un codigo RUE.
 - `rue_seccion`: seccion equivalente del modulo de infraestructura de RUE.
@@ -38,3 +43,11 @@ Los campos `drive_file_id`, `drive_url` y `thumbnail_url` relacionan Sheets con 
 | `sitio_id` | Construccion o sede fisica que se visita | `CIALPA-S###` |
 
 Las entradas pueden contener el codigo interno o el codigo RUE. Antes de guardar, el backend resuelve el establecimiento en `ESCUELAS` y conserva simultaneamente el codigo interno canonico, `codigo_rue` y `sitio_id`. Esta regla se aplica a `REGISTROS` y `FOTOS`; evita que `11007` y `0011007` creen escuelas o fichas duplicadas.
+
+## Reglas de equipos y asignaciones
+
+- `EQUIPOS.coordinador_codigo` vincula un perfil `SUPERVISOR` o `ADMIN`; un coordinador puede administrar mas de un equipo.
+- Un perfil `ENCUESTADOR` solo puede tener una membresia activa. Cambiarlo de equipo inactiva la membresia anterior y crea o reactiva la nueva.
+- `ASIGNACIONES.equipo_id` determina el acceso compartido. `codigo_censista` conserva el representante operativo compatible con versiones anteriores.
+- Activar una asignacion inactiva las demas filas activas de la misma escuela. Inactivar cambia `activo`, `asignado_por` y `updated_at`; no elimina historia.
+- Inactivar un equipo inactiva sus asignaciones activas. Los registros y fotografias ya capturados permanecen intactos y auditables.

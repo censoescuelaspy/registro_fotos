@@ -70,6 +70,7 @@ const state = {
     logisticsStatus: '', logisticsSurveyor: '', requestStatus: 'PENDIENTE'
   },
   editingUserCode: '',
+  editingTeamId: '',
   logisticsOriginal: {},
   logisticsDraft: {},
   logisticsInitialized: false,
@@ -928,7 +929,13 @@ function supervisorMode() {
 }
 
 function operationalCatalog() {
-  return supervisorMode() ? availableSchools() : state.catalog;
+  if (!supervisorMode()) return state.catalog;
+  const manageableCodes = Array.isArray(state.admin?.manageableSchoolCodes)
+    ? new Set(state.admin.manageableSchoolCodes.map(String))
+    : null;
+  return manageableCodes
+    ? state.catalog.filter((school) => manageableCodes.has(String(school.codigo)))
+    : availableSchools();
 }
 
 function renderOperationsGuard() {
@@ -980,9 +987,12 @@ function renderAdmin() {
   const sharedSites = [...new Set(catalog.map((school) => school.sitioId || school.codigo))]
     .filter((site) => catalog.filter((school) => (school.sitioId || school.codigo) === site).length > 1).length;
   const completedSchools = catalog.filter((school) => schoolStatus(progress, school.codigo) === 'FINALIZADO').length;
-  const teamName = String((state.bootstrap?.user || {}).equipo || '');
+  const coordinatedTeamNames = (state.admin?.teams || [])
+    .filter((team) => team.activo)
+    .map((team) => team.nombre);
+  const teamName = coordinatedTeamNames.length === 1 ? coordinatedTeamNames[0] : 'mis equipos';
   return `<section class="view operations-view">
-    <div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>${supervisorMode() ? `Resumen de ${escapeHtml(teamName || 'mi equipo')}` : 'Resumen general'}</h1><p>${supervisorMode() ? 'Escuelas, encuestadores y avance asignados exclusivamente a su equipo.' : 'Avance consolidado del relevamiento fotografico.'}</p></div><div class="button-row"><button class="btn btn-primary" data-action="export-rue" ${state.rueExporting ? 'disabled' : ''}>${icon('file-down')} ${state.rueExporting ? 'Preparando...' : 'Conciliar con RUE'}</button>${state.admin.photoRootUrl ? `<a class="btn btn-secondary" href="${escapeHtml(state.admin.photoRootUrl)}" target="_blank" rel="noopener">${icon('folder-open')} Abrir carpeta en Drive</a>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
+    <div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>${supervisorMode() ? `Resumen de ${escapeHtml(teamName)}` : 'Resumen general'}</h1><p>${supervisorMode() ? 'Escuelas, encuestadores y avance de los equipos bajo su coordinacion.' : 'Avance consolidado del relevamiento fotografico.'}</p></div><div class="button-row"><button class="btn btn-primary" data-action="export-rue" ${state.rueExporting ? 'disabled' : ''}>${icon('file-down')} ${state.rueExporting ? 'Preparando...' : 'Conciliar con RUE'}</button>${state.admin.photoRootUrl ? `<a class="btn btn-secondary" href="${escapeHtml(state.admin.photoRootUrl)}" target="_blank" rel="noopener">${icon('folder-open')} Abrir carpeta en Drive</a>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
     ${renderAdminTabs('admin')}
     <div class="summary-strip admin-summary">
       <div><span>Escuelas finalizadas</span><strong>${completedSchools}/${catalog.length}</strong></div>
@@ -1027,10 +1037,11 @@ function renderSurveyors() {
   });
   const editing = users.find((item) => String(item.codigoCensista) === state.editingUserCode) || null;
   const activeSurveyors = users.filter((item) => item.activo && item.rol === 'ENCUESTADOR').length;
-  const teamName = String(currentUser.equipo || '');
+  const coordinatedTeams = (state.admin.teams || []).filter((team) => team.activo).length;
   return `<section class="view operations-view">
-    <div class="view-heading"><div><p class="eyebrow">Equipo de campo</p><h1>${supervisorMode() ? `Encuestadores de ${escapeHtml(teamName || 'mi equipo')}` : 'Administrar encuestadores'}</h1><p>${supervisorMode() ? 'Lista de integrantes asignados a su equipo.' : `${filtered.length} usuarios visibles de ${users.length}.`}</p></div><div class="button-row">${currentUser.rol === 'ADMIN' ? `<button class="btn btn-primary" data-action="new-user">${icon('user-plus')} Nuevo encuestador</button>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
+    <div class="view-heading"><div><p class="eyebrow">Equipo de campo</p><h1>${supervisorMode() ? 'Equipos coordinados' : 'Administrar encuestadores'}</h1><p>${supervisorMode() ? `${coordinatedTeams} equipos activos bajo su coordinacion.` : `${filtered.length} usuarios visibles de ${users.length}.`}</p></div><div class="button-row">${currentUser.rol === 'ADMIN' ? `<button class="btn btn-primary" data-action="new-user">${icon('user-plus')} Nuevo encuestador</button>` : ''}<button class="btn btn-secondary" data-action="new-team">${icon('users-round')} Crear equipo</button><button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
     ${renderAdminTabs('surveyors')}
+    ${renderTeamManagement()}
     <div class="summary-strip">
       <div><span>Total de usuarios</span><strong>${users.length}</strong></div>
       <div><span>Encuestadores activos</span><strong>${activeSurveyors}</strong></div>
@@ -1063,12 +1074,32 @@ function renderUserEditor(editing) {
       <label>Telefono<input name="telefono" value="${escapeHtml(user.telefono || '')}" inputmode="tel" maxlength="30"></label>
       <label>${editing ? 'Nuevo PIN (opcional)' : 'PIN inicial'}<input name="pin" type="password" inputmode="numeric" minlength="4" maxlength="12" ${editing ? '' : 'required'}></label>
       <label>Rol<select name="rol">${['ENCUESTADOR', 'SUPERVISOR', 'ADMIN'].map((role) => `<option value="${role}" ${user.rol === role ? 'selected' : ''}>${roleLabel(role)}</option>`).join('')}</select></label>
-      <label>Equipo<select name="equipo"><option value="">Sin equipo</option>${Array.from({ length: 8 }, (_, index) => `Equipo ${index + 1}`).map((team) => `<option value="${team}" ${user.equipo === team ? 'selected' : ''}>${team}</option>`).join('')}</select></label>
+      <label>Equipo<input value="${escapeHtml(user.equipo || 'Sin equipo')}" readonly><input name="equipo" type="hidden" value="${escapeHtml(user.equipo || '')}"><small>Los integrantes se asignan desde Gestion de equipos.</small></label>
       <label class="checkbox-label"><input name="disponibleCampo" type="checkbox" ${user.disponibleCampo !== false ? 'checked' : ''}> Disponible para campo</label>
       <label>Motivo de ausencia<input name="motivoIndisponibilidad" value="${escapeHtml(user.motivoIndisponibilidad || '')}" maxlength="250" placeholder="Solo si no esta disponible"></label>
       <label class="checkbox-label"><input name="activo" type="checkbox" ${user.activo !== false ? 'checked' : ''}> Usuario activo</label>
       <button class="btn btn-primary" type="submit">${icon(editing ? 'save' : 'user-plus')} ${editing ? 'Guardar cambios' : 'Crear usuario'}</button>
     </form>
+  </section>`;
+}
+
+function renderTeamManagement() {
+  const currentUser = state.bootstrap?.user || {};
+  const teams = state.admin?.teams || [];
+  const users = state.admin?.managementUsers || state.admin?.users || [];
+  const memberships = state.admin?.teamMembers || [];
+  const surveyors = users.filter((user) => user.activo && user.rol === 'ENCUESTADOR');
+  const coordinators = users.filter((user) => user.activo && ['SUPERVISOR', 'ADMIN'].includes(user.rol));
+  const editing = teams.find((team) => team.equipoId === state.editingTeamId) || null;
+  const showEditor = state.editingTeamId === '__NEW__' || editing;
+  const editor = editing || { equipoId: '', nombre: '', coordinadorCodigo: currentUser.rol === 'SUPERVISOR' ? currentUser.codigoCensista : '', notas: '' };
+  return `<section class="content-section team-management"><div class="section-heading"><div><h2>Gestion de equipos</h2><p>Cree equipos, asigne coordinacion e integrantes. Los movimientos conservan historial y una persona solo puede pertenecer a un equipo activo.</p></div></div>
+    ${showEditor ? `<form data-form="save-team" class="form-grid team-editor"><input name="equipoId" type="hidden" value="${escapeHtml(editor.equipoId)}"><label>Nombre del equipo<input name="nombre" value="${escapeHtml(editor.nombre)}" required maxlength="60" placeholder="Ej.: Equipo 9"></label>${currentUser.rol === 'ADMIN' ? `<label>Coordinador<select name="coordinadorCodigo"><option value="">Administracion temporal</option>${coordinators.map((user) => `<option value="${escapeHtml(user.codigoCensista)}" ${editor.coordinadorCodigo === user.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(user))}</option>`).join('')}</select></label>` : `<input name="coordinadorCodigo" type="hidden" value="${escapeHtml(currentUser.codigoCensista)}">`}<label>Notas<input name="notas" value="${escapeHtml(editor.notas || '')}" maxlength="500" placeholder="Referencia operativa opcional"></label><div class="button-row"><button class="btn btn-primary" type="submit">${icon('save')} ${editing ? 'Guardar equipo' : 'Crear equipo'}</button><button class="btn btn-secondary" type="button" data-action="cancel-team-edit">Cancelar</button></div></form>` : ''}
+    <div class="team-grid">${teams.map((team) => {
+      const memberCodes = new Set(memberships.filter((member) => member.equipoId === team.equipoId && member.activo).map((member) => member.codigoCensista));
+      const coordinator = users.find((user) => user.codigoCensista === team.coordinadorCodigo);
+      return `<article class="team-card ${team.activo ? '' : 'is-inactive'}"><div class="team-card-heading"><div><strong>${escapeHtml(team.nombre)}</strong><small>${coordinator ? `Coordina ${escapeHtml(displayName(coordinator))}` : 'Coordinacion administrativa pendiente'}</small></div><span class="status-pill ${team.activo ? 'status-finalizado' : 'status-pendiente'}">${team.activo ? 'Activo' : 'Inactivo'}</span></div><form data-form="save-team-members"><input name="equipoId" type="hidden" value="${escapeHtml(team.equipoId)}"><label>Encuestadores<select name="memberCodes" multiple size="${Math.min(7, Math.max(3, surveyors.length))}" ${team.activo ? '' : 'disabled'}>${surveyors.map((user) => `<option value="${escapeHtml(user.codigoCensista)}" ${memberCodes.has(user.codigoCensista) ? 'selected' : ''}>${escapeHtml(displayName(user))} · ${escapeHtml(user.codigoCensista)}</option>`).join('')}</select><small>En computadora use Ctrl/Cmd; en celular seleccione desde el control del sistema.</small></label><div class="team-members-summary">${memberCodes.size} integrante${memberCodes.size === 1 ? '' : 's'}</div><div class="button-row"><button class="btn btn-secondary" type="submit" ${team.activo ? '' : 'disabled'}>${icon('user-round-check')} Guardar integrantes</button><button class="icon-btn" type="button" data-action="edit-team" data-team="${escapeHtml(team.equipoId)}" title="Editar equipo" aria-label="Editar ${escapeHtml(team.nombre)}">${icon('pencil')}</button><button class="btn ${team.activo ? 'btn-danger' : 'btn-secondary'}" type="button" data-action="toggle-team" data-team="${escapeHtml(team.equipoId)}" data-active="${team.activo ? 'false' : 'true'}">${icon(team.activo ? 'pause-circle' : 'play-circle')} ${team.activo ? 'Inactivar' : 'Activar'}</button></div></form></article>`;
+    }).join('') || renderEmpty('users-round', 'Todavia no hay equipos creados.', 'Pulse Crear equipo para comenzar.')}</div>
   </section>`;
 }
 
@@ -1078,7 +1109,7 @@ function renderLogistics() {
   const users = state.admin.users || [];
   const progress = state.bootstrap?.progress || {};
   const assignments = state.logisticsDraft || {};
-  const fieldUsers = teamAssignmentOptions(users);
+  const fieldUsers = teamAssignmentOptions(users, state.admin.teams || [], state.admin.teamMembers || []);
   const catalog = operationalCatalog();
   const changed = changedAssignmentItems(state.logisticsOriginal, assignments, catalog);
   const metrics = logisticsMetrics(catalog, fieldUsers, assignments, progress, state.planningSettings);
@@ -1096,7 +1127,7 @@ function renderLogistics() {
   });
   const maxLoad = Math.max(1, ...workloads.map((item) => item.asignadas));
   return `<section class="view operations-view logistics-view">
-    <div class="view-heading"><div><p class="eyebrow">Planificacion territorial</p><h1>Logistica de campo</h1><p>${filtered.length} escuelas visibles de ${catalog.length}${supervisorMode() ? ' en su equipo' : ''}.</p></div><div class="button-row"><button class="btn btn-secondary" data-action="export-logistics">${icon('download')} CSV</button><button class="btn btn-secondary" data-action="undo-logistics" ${changed.length ? '' : 'disabled'}>${icon('undo-2')} Deshacer</button><button class="btn btn-primary" data-action="save-logistics" ${changed.length && !state.logisticsSaving ? '' : 'disabled'}>${icon('save')} ${state.logisticsSaving ? 'Guardando...' : `Guardar ${changed.length || ''} cambio${changed.length === 1 ? '' : 's'}`}</button></div></div>
+    <div class="view-heading"><div><p class="eyebrow">Planificacion territorial</p><h1>Logistica de campo</h1><p>${filtered.length} escuelas visibles de ${catalog.length}${supervisorMode() ? ' entre sus equipos y las disponibles' : ''}.</p></div><div class="button-row"><button class="btn btn-secondary" data-action="export-logistics">${icon('download')} CSV</button><button class="btn btn-secondary" data-action="undo-logistics" ${changed.length ? '' : 'disabled'}>${icon('undo-2')} Deshacer</button><button class="btn btn-primary" data-action="save-logistics" ${changed.length && !state.logisticsSaving ? '' : 'disabled'}>${icon('save')} ${state.logisticsSaving ? 'Guardando...' : `Guardar ${changed.length || ''} cambio${changed.length === 1 ? '' : 's'}`}</button></div></div>
     ${renderAdminTabs('logistics')}
     <div class="planning-band">
       <label>Minutos por escuela<input type="number" min="5" max="1440" step="5" data-planning-setting="baseMinutes" value="${state.planningSettings.baseMinutes}"></label>
@@ -1125,8 +1156,13 @@ function renderLogistics() {
     <div class="data-table-wrap logistics-table"><table><thead><tr><th>Orden</th><th>Escuela</th><th>Departamento / distrito</th><th>Estado</th><th>Equipo asignado</th><th>Mapa</th></tr></thead><tbody>${filtered.map((school) => {
       const assignedCode = String(assignments[school.codigo] || '');
       const originalCode = String(state.logisticsOriginal[school.codigo] || '');
-      const assignedUser = users.find((item) => item.codigoCensista === assignedCode);
-      return `<tr class="${assignedCode !== originalCode ? 'is-dirty' : ''}"><td>${school.ordenMuestra || ''}</td><td><strong>${escapeHtml(school.nombre)}</strong><br><small>RUE ${escapeHtml(school.codigoRue || normalizeRueSchoolCode(school.codigo))} · Interno ${escapeHtml(school.codigo)} · ${escapeHtml(school.sitioId || '')} · ${escapeHtml(school.localidad)}</small></td><td>${escapeHtml(school.departamento)}<br><small>${escapeHtml(school.distrito)}</small></td><td><span class="status-pill status-${schoolStatus(progress, school.codigo).toLowerCase()}">${statusLabel(schoolStatus(progress, school.codigo))}</span></td><td><select data-logistics-assignment="${school.codigo}" aria-label="Equipo para ${escapeHtml(school.nombre)}"><option value="">Sin asignar</option>${assignedUser && !fieldUsers.some((item) => item.codigoCensista === assignedCode) ? `<option value="${escapeHtml(assignedCode)}" selected>${escapeHtml(displayName(assignedUser))} (inactivo)</option>` : ''}${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${assignedCode === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))}</option>`).join('')}</select></td><td><a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${school.latitud},${school.longitud}" target="_blank" rel="noopener" title="Ver escuela en Google Maps" aria-label="Ver ${escapeHtml(school.nombre)} en Google Maps">${icon('map-pin')}</a></td></tr>`;
+      const assignedUser = fieldUsers.find((item) => item.codigoCensista === assignedCode)
+        || users.find((item) => item.codigoCensista === assignedCode);
+      const changedTarget = assignedCode !== originalCode;
+      const actionLabel = originalCode ? (changedTarget && assignedCode ? 'Cambiar' : 'Inactivar') : 'Activar';
+      const activate = !originalCode || Boolean(changedTarget && assignedCode);
+      const actionDisabled = !originalCode && !assignedCode;
+      return `<tr class="${changedTarget ? 'is-dirty' : ''}"><td>${school.ordenMuestra || ''}</td><td><strong>${escapeHtml(school.nombre)}</strong><br><small>RUE ${escapeHtml(school.codigoRue || normalizeRueSchoolCode(school.codigo))} · Interno ${escapeHtml(school.codigo)} · ${escapeHtml(school.sitioId || '')} · ${escapeHtml(school.localidad)}</small></td><td>${escapeHtml(school.departamento)}<br><small>${escapeHtml(school.distrito)}</small></td><td><span class="status-pill ${originalCode ? 'status-finalizado' : 'status-pendiente'}">${originalCode ? 'Asignacion activa' : 'Asignacion inactiva'}</span><br><small>${statusLabel(schoolStatus(progress, school.codigo))}</small></td><td><div class="assignment-control"><select data-logistics-assignment="${school.codigo}" aria-label="Equipo para ${escapeHtml(school.nombre)}"><option value="">Sin asignar</option>${assignedUser && !fieldUsers.some((item) => item.codigoCensista === assignedCode) ? `<option value="${escapeHtml(assignedCode)}" selected>${escapeHtml(displayName(assignedUser))} (historico)</option>` : ''}${fieldUsers.map((item) => `<option value="${item.codigoCensista}" ${assignedCode === item.codigoCensista ? 'selected' : ''}>${escapeHtml(displayName(item))}</option>`).join('')}</select><button class="btn ${activate ? 'btn-primary' : 'btn-danger'}" data-action="toggle-assignment" data-school="${escapeHtml(school.codigo)}" data-active="${activate ? 'true' : 'false'}" ${actionDisabled ? 'disabled' : ''}>${icon(activate ? 'play-circle' : 'pause-circle')} ${actionLabel}</button></div></td><td><a class="icon-btn" href="https://www.google.com/maps/search/?api=1&query=${school.latitud},${school.longitud}" target="_blank" rel="noopener" title="Ver escuela en Google Maps" aria-label="Ver ${escapeHtml(school.nombre)} en Google Maps">${icon('map-pin')}</a></td></tr>`;
     }).join('') || '<tr><td colspan="6">No hay escuelas con estos filtros.</td></tr>'}</tbody></table></div>
     </section>
   </section>`;
@@ -1327,6 +1363,17 @@ async function loadAdmin(force = false) {
 
 function resetLogisticsDraft() {
   const assignments = primaryAssignmentMap(state.admin?.assignments || []);
+  const options = teamAssignmentOptions(
+    state.admin?.users || [],
+    state.admin?.teams || [],
+    state.admin?.teamMembers || []
+  );
+  const representativeByTeam = new Map(options.filter((item) => item.equipoId)
+    .map((item) => [String(item.equipoId), String(item.codigoCensista)]));
+  (state.admin?.assignments || []).filter((item) => item.activo && item.equipoId).forEach((item) => {
+    const representative = representativeByTeam.get(String(item.equipoId));
+    if (representative) assignments[String(item.codigoEscuela)] = representative;
+  });
   state.logisticsOriginal = { ...assignments };
   state.logisticsDraft = { ...assignments };
   state.logisticsInitialized = true;
@@ -1345,6 +1392,8 @@ async function handleSubmit(event) {
     if (form.dataset.form === 'record') await finalizeRecord(form);
     if (form.dataset.form === 'save-user') await saveUser(form);
     if (form.dataset.form === 'save-assignment') await saveAssignment(form);
+    if (form.dataset.form === 'save-team') await saveTeam(form);
+    if (form.dataset.form === 'save-team-members') await saveTeamMembers(form);
   } catch (error) {
     toast(error.message || 'No se pudo completar la accion.', 'error', 6500);
   } finally {
@@ -1553,6 +1602,66 @@ async function saveAssignment(form) {
   toast('Asignacion guardada.', 'success');
 }
 
+async function saveTeam(form) {
+  const data = Object.fromEntries(new FormData(form));
+  const result = await api.saveTeam(data);
+  state.editingTeamId = '';
+  await loadAdmin(true);
+  toast(data.equipoId ? 'Equipo actualizado.' : `Equipo creado (${result.equipoId}).`, 'success');
+}
+
+async function saveTeamMembers(form) {
+  const formData = new FormData(form);
+  const equipoId = String(formData.get('equipoId') || '');
+  const memberCodes = formData.getAll('memberCodes').map(String);
+  const result = await api.saveTeamMembers(equipoId, memberCodes);
+  await loadBootstrap(true);
+  await loadAdmin(true);
+  toast(`${result.integrantes ?? memberCodes.length} integrante${memberCodes.length === 1 ? '' : 's'} guardado${memberCodes.length === 1 ? '' : 's'}.`, 'success');
+}
+
+async function toggleTeam(equipoId, active) {
+  const team = (state.admin?.teams || []).find((item) => item.equipoId === equipoId);
+  if (!team) throw new Error('No se encontro el equipo.');
+  const warning = active
+    ? `¿Activar ${team.nombre}?`
+    : `¿Inactivar ${team.nombre}? Sus asignaciones activas tambien quedaran inactivas, sin borrar el historial.`;
+  if (!confirm(warning)) return;
+  const result = await api.setTeamActive(equipoId, active);
+  await loadBootstrap(true);
+  await loadAdmin(true);
+  toast(active ? 'Equipo activado.' : `Equipo inactivado. ${result.asignacionesInactivadas || 0} asignaciones desactivadas.`, 'success');
+}
+
+async function toggleAssignment(schoolCode, activate) {
+  const target = activate ? String(state.logisticsDraft?.[schoolCode] || '') : '';
+  if (activate && !target) throw new Error('Seleccione un equipo antes de activar la asignacion.');
+  const school = operationalCatalog().find((item) => String(item.codigo) === String(schoolCode));
+  const action = activate ? 'activar' : 'inactivar';
+  if (!confirm(`¿Confirma ${action} la asignacion de ${school?.nombre || schoolCode}?`)) return;
+  state.logisticsSaving = true;
+  render();
+  try {
+    const option = teamAssignmentOptions(
+      state.admin?.users || [],
+      state.admin?.teams || [],
+      state.admin?.teamMembers || []
+    ).find((item) => String(item.codigoCensista) === target);
+    await api.setAssignmentActive({
+      codigoEscuela: schoolCode,
+      codigoCensista: target,
+      equipoId: option?.equipoId || '',
+      activo: activate
+    });
+    await loadBootstrap(true);
+    await loadAdmin(true);
+    toast(`Asignacion ${activate ? 'activada' : 'inactivada'} sin eliminar el historial.`, 'success');
+  } finally {
+    state.logisticsSaving = false;
+    if (state.view === 'logistics') render();
+  }
+}
+
 async function toggleUser(code, active) {
   const user = (state.admin?.users || []).find((item) => String(item.codigoCensista) === String(code));
   if (!user || user.codigoCensista === 'admin') throw new Error('La cuenta administrativa principal esta protegida.');
@@ -1668,12 +1777,23 @@ async function toggleAvailability(code, available) {
 }
 
 async function saveLogistics() {
-  const items = changedAssignmentItems(state.logisticsOriginal, state.logisticsDraft, operationalCatalog());
+  const options = teamAssignmentOptions(
+    state.admin?.users || [],
+    state.admin?.teams || [],
+    state.admin?.teamMembers || []
+  );
+  const optionByRepresentative = new Map(options.map((item) => [String(item.codigoCensista), item]));
+  const items = changedAssignmentItems(state.logisticsOriginal, state.logisticsDraft, operationalCatalog())
+    .map((item) => ({
+      ...item,
+      equipoId: optionByRepresentative.get(String(item.codigoCensista))?.equipoId || '',
+      activo: Boolean(item.codigoCensista)
+    }));
   if (!items.length || state.logisticsSaving) return;
   state.logisticsSaving = true;
   render();
   try {
-    const result = await api.saveAssignmentsBatch(items);
+    const result = await api.saveTeamAssignmentsBatch(items);
     await loadBootstrap(true);
     await loadAdmin(true);
     toast(`${result.updated ?? items.length} asignacion${items.length === 1 ? '' : 'es'} actualizada${items.length === 1 ? '' : 's'}.`, 'success');
@@ -1687,7 +1807,7 @@ function balanceLogistics() {
   if (!confirm('Se redistribuiran en el borrador todas las escuelas no finalizadas. ¿Continuar?')) return;
   const balanced = balancePendingAssignments(
     operationalCatalog(),
-    teamAssignmentOptions(state.admin?.users || []),
+    teamAssignmentOptions(state.admin?.users || [], state.admin?.teams || [], state.admin?.teamMembers || []),
     state.logisticsDraft,
     state.bootstrap?.progress || {}
   );
@@ -1700,7 +1820,7 @@ function balanceLogistics() {
 function exportLogistics() {
   const content = logisticsCsv(
     operationalCatalog(),
-    state.admin?.users || [],
+    teamAssignmentOptions(state.admin?.users || [], state.admin?.teams || [], state.admin?.teamMembers || []),
     state.logisticsDraft,
     state.bootstrap?.progress || {}
   );
@@ -1862,6 +1982,21 @@ async function handleClick(event) {
     state.editingUserCode = '';
     render();
   }
+  if (action === 'new-team') {
+    state.editingTeamId = '__NEW__';
+    render();
+    document.querySelector('.team-editor input[name="nombre"]')?.focus();
+  }
+  if (action === 'edit-team') {
+    state.editingTeamId = button.dataset.team;
+    render();
+    document.querySelector('.team-editor')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  if (action === 'cancel-team-edit') {
+    state.editingTeamId = '';
+    render();
+  }
+  if (action === 'toggle-team') await toggleTeam(button.dataset.team, button.dataset.active === 'true');
   if (action === 'toggle-user') await toggleUser(button.dataset.user, button.dataset.active === 'true');
   if (action === 'toggle-availability') await toggleAvailability(button.dataset.user, button.dataset.available === 'true');
   if (action === 'balance-logistics') balanceLogistics();
@@ -1871,6 +2006,7 @@ async function handleClick(event) {
     toast('Cambios de asignacion descartados.', 'info');
   }
   if (action === 'save-logistics') await saveLogistics();
+  if (action === 'toggle-assignment') await toggleAssignment(button.dataset.school, button.dataset.active === 'true');
   if (action === 'export-logistics') exportLogistics();
   if (action === 'export-rue') await exportRueCompatibility();
   if (action === 'review-access') await reviewAccess(button.dataset.request, button.dataset.status);
@@ -2193,7 +2329,7 @@ function normalizeBootstrapSchoolCodes(data = {}) {
   const recentRecords = (data.recentRecords || []).map((record) => ({
     ...record,
     codigoEscuela: canonicalSchoolCode(record.codigoEscuela)
-  })).filter((record) => role === 'ADMIN' || allowedSchools.has(record.codigoEscuela));
+  })).filter((record) => record.codigoEscuela);
   return {
     ...data,
     assignedCodes,
@@ -2210,16 +2346,11 @@ function normalizeRemoteSchoolCodes(data = {}) {
     codigoRue: item.codigoRue || schoolByCode(item.codigoEscuela)?.codigoRue || normalizeRueSchoolCode(item.codigoEscuela),
     sitioId: item.sitioId || schoolByCode(item.codigoEscuela)?.sitioId || ''
   });
-  const role = String((state.bootstrap?.user || state.session?.user || {}).rol || '').toUpperCase();
-  const allowedSchools = new Set((state.bootstrap?.assignedCodes || []).map(canonicalSchoolCode).filter(Boolean));
   const records = (data.records || []).map(normalizeItem)
-    .filter((item) => role === 'ADMIN' || allowedSchools.has(item.codigoEscuela));
+    .filter((item) => item.codigoEscuela);
   const recordKeys = new Set(records.map(recordKeyOf).filter(Boolean));
-  const photos = (data.photos || []).map(normalizeItem).filter((item) => {
-    if (role === 'ADMIN') return true;
-    const key = recordKeyOf(item);
-    return (key && recordKeys.has(key)) || allowedSchools.has(item.codigoEscuela);
-  });
+  const photos = (data.photos || []).map(normalizeItem)
+    .filter((item) => recordKeys.has(recordKeyOf(item)));
   const recordCodes = new Set(records.map((record) => record.codigoEscuela).filter(Boolean));
   const schools = (data.schools || []).map((school) => {
     const code = canonicalSchoolCode(school.codigo || school.codigoRue);
@@ -2245,45 +2376,13 @@ function normalizeAdminSchoolCodes(data = {}) {
     ...assignment,
     codigoEscuela: canonicalSchoolCode(assignment.codigoEscuela)
   }));
-  if (!supervisorMode()) return { ...data, assignments };
-
-  const current = state.bootstrap?.user || {};
-  const team = String(current.equipo || '').trim();
-  const users = (data.users || []).filter((user) => team && String(user.equipo || '').trim() === team);
-  const allowedUsers = new Set(users.map((user) => String(user.codigoCensista)));
-  const allowedSchools = new Set((state.bootstrap?.assignedCodes || []).map(canonicalSchoolCode).filter(Boolean));
-  const scopedAssignments = assignments.filter((assignment) => allowedUsers.has(String(assignment.codigoCensista))
-    && allowedSchools.has(assignment.codigoEscuela));
-  const records = (data.records || []).map((record) => ({
-    ...record,
-    codigoEscuela: canonicalSchoolCode(record.codigoEscuela)
-  })).filter((record) => allowedUsers.has(String(record.codigoCensista)) && allowedSchools.has(record.codigoEscuela));
-  const surveyorSummary = (data.surveyorSummary || []).filter((item) => allowedUsers.has(String(item.codigoCensista)));
-  const requests = (data.requests || []).filter((request) => allowedUsers.has(String(request.codigoCensista)));
-  const performance = {
-    ...(data.performance || {}),
-    individuals: (data.performance?.individuals || []).filter((item) => allowedUsers.has(String(item.codigoCensista))),
-    teams: (data.performance?.teams || []).filter((item) => String(item.equipo || '').trim() === team)
-  };
-  return {
-    ...data,
-    counts: {
-      usuarios: users.length,
-      asignaciones: scopedAssignments.filter((item) => item.activo !== false).length,
-      registros: records.length,
-      fotos: surveyorSummary.reduce((sum, item) => sum + Number(item.fotos || 0), 0),
-      fotosTotales: Number(data.counts?.fotosTotales || 0),
-      fotosHuerfanas: Number(data.dataQuality?.photosOrphaned || data.counts?.fotosHuerfanas || 0),
-      solicitudesPendientes: requests.filter((item) => item.estado === 'PENDIENTE').length
-    },
-    users,
-    assignments: scopedAssignments,
-    requests,
-    surveyorSummary,
-    records,
-    photoRootUrl: '',
-    performance
-  };
+  // El backend es la autoridad de permisos y ya devuelve los equipos que el
+  // coordinador puede administrar. Filtrar otra vez por el campo legado
+  // `equipo` ocultaria los equipos adicionales bajo una misma coordinacion.
+  const manageableSchoolCodes = Array.isArray(data.manageableSchoolCodes)
+    ? [...new Set(data.manageableSchoolCodes.map(canonicalSchoolCode).filter(Boolean))]
+    : data.manageableSchoolCodes;
+  return { ...data, assignments, manageableSchoolCodes };
 }
 
 function calculateRecordId(draft) {
@@ -2392,7 +2491,7 @@ function requestStatusLabel(status = 'PENDIENTE') {
 }
 
 function roleLabel(role = '') {
-  return ({ ADMIN: 'Administrador', SUPERVISOR: 'Supervisor', ENCUESTADOR: 'Encuestador' })[role] || role;
+  return ({ ADMIN: 'Administrador', SUPERVISOR: 'Coordinador', ENCUESTADOR: 'Encuestador' })[role] || role;
 }
 
 function displayName(user = {}) {
@@ -2412,8 +2511,29 @@ function elapsedMinutesLabel(startedAt) {
   return minutesLabel(seconds / 60);
 }
 
-function teamAssignmentOptions(users = []) {
+function teamAssignmentOptions(users = [], normalizedTeams = [], normalizedMemberships = []) {
   const active = users.filter((item) => item.activo && item.rol === 'ENCUESTADOR');
+  if (normalizedTeams.length) {
+    const byCode = new Map(active.map((user) => [String(user.codigoCensista), user]));
+    return normalizedTeams.filter((team) => team.activo).map((team) => {
+      const members = normalizedMemberships
+        .filter((member) => member.activo && member.equipoId === team.equipoId)
+        .map((member) => byCode.get(String(member.codigoCensista)))
+        .filter(Boolean)
+        .sort((left, right) => String(left.codigoCensista).localeCompare(String(right.codigoCensista)));
+      if (!members.length) return null;
+      const representative = members[0];
+      return {
+        ...representative,
+        equipoId: team.equipoId,
+        nombres: team.nombre,
+        apellidos: members.map((member) => displayName(member)).join(' / '),
+        telefono: '',
+        equipo: team.nombre,
+        memberCodes: members.map((member) => String(member.codigoCensista))
+      };
+    }).filter(Boolean).sort((left, right) => left.equipo.localeCompare(right.equipo, 'es', { numeric: true }));
+  }
   const teams = new Map();
   const ungrouped = [];
   active.forEach((user) => {

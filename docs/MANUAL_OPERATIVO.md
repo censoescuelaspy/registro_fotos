@@ -66,11 +66,20 @@ Este archivo no carga informacion automaticamente en RUE. Se utiliza para revisi
 
 ## Vista del supervisor
 
-- El perfil **SUPERVISOR** ve en **Escuelas** todas las ubicaciones asignadas a integrantes de su mismo equipo, no solamente las que figuran a su nombre.
-- En **Control** observa exclusivamente el avance, los registros, las fotos, los KPI y las contingencias de ese equipo.
-- En **Encuestadores** obtiene la lista de su supervisor y censistas asignados, con rol, estado, disponibilidad, escuelas, registros, fotos y ultimo acceso.
-- La capacidad de campo se calcula con los perfiles **ENCUESTADOR**; el supervisor aparece en la lista del equipo, pero no aumenta artificialmente la cantidad de personal que realiza fichas.
-- En **Logistica** solo aparecen las escuelas y las personas del equipo. Un supervisor puede redistribuir una escuela ya perteneciente a su equipo, pero no incorporar personas ni escuelas de otro equipo.
+- El perfil **SUPERVISOR** actua como coordinador y puede estar a cargo de uno o varios equipos.
+- En **Escuelas** ve todas las ubicaciones activas de los equipos que coordina, no solamente las que figuran a su nombre.
+- En **Control** observa exclusivamente el avance, los registros, las fotos, los KPI y las contingencias de esos equipos.
+- En **Encuestadores > Gestion de equipos** puede crear equipos, editar su nombre y notas, seleccionar integrantes y activar o inactivar el equipo. Un encuestador solo puede pertenecer a un equipo activo; no puede tomar integrantes administrados por otra coordinacion.
+- La capacidad de campo se calcula con perfiles **ENCUESTADOR**. El coordinador no aumenta artificialmente la cantidad de personal que realiza fichas.
+- En **Logistica** puede asignar a sus equipos una escuela disponible o redistribuir una escuela propia. No puede intervenir una escuela activa de otra coordinacion.
+
+### Activar o inactivar asignaciones
+
+1. Abra **Control > Logistica** y ubique la escuela con los filtros territoriales o el buscador.
+2. Para activar, seleccione un equipo con integrantes activos y pulse **Activar**. Para moverla, seleccione otro equipo propio y pulse **Cambiar**.
+3. Para retirar temporalmente una escuela, pulse **Inactivar** y confirme la advertencia.
+4. La fila historica no se elimina. El sistema registra usuario y fecha del cambio, y conserva registros y fotografias previas.
+5. Al inactivar un equipo, todas sus asignaciones activas tambien quedan inactivas. Reactivar el equipo no reactiva escuelas automaticamente: deben seleccionarse de forma expresa.
 
 ## Consulta de fotografias sincronizadas
 

@@ -91,9 +91,17 @@ function demoData() {
       ...(APP_CONFIG.loadTest ? [DEMO_LOAD_USER] : [])
     ],
     assignments: [
-      { assignmentId: crypto.randomUUID(), codigoCensista: '2345678', codigoEscuela: '11007', activo: true, updatedAt: new Date().toISOString() },
-      { assignmentId: crypto.randomUUID(), codigoCensista: '3456789', codigoEscuela: '10038', activo: true, updatedAt: new Date().toISOString() },
+      { assignmentId: crypto.randomUUID(), codigoCensista: '2345678', codigoEscuela: '11007', equipoId: 'demo-team-1', activo: true, updatedAt: new Date().toISOString() },
+      { assignmentId: crypto.randomUUID(), codigoCensista: '3456789', codigoEscuela: '10038', equipoId: 'demo-team-2', activo: true, updatedAt: new Date().toISOString() },
       ...(APP_CONFIG.loadTest ? [{ assignmentId: crypto.randomUUID(), codigoCensista: DEMO_LOAD_USER.codigoCensista, codigoEscuela: DEMO_LOAD_SCHOOL.codigo, activo: true, updatedAt: new Date().toISOString() }] : [])
+    ],
+    teams: [
+      { equipoId: 'demo-team-1', nombre: 'Equipo 1', coordinadorCodigo: '5678901', activo: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), notas: '' },
+      { equipoId: 'demo-team-2', nombre: 'Equipo 2', coordinadorCodigo: '1234567', activo: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), notas: '' }
+    ],
+    teamMembers: [
+      { membershipId: crypto.randomUUID(), equipoId: 'demo-team-1', codigoCensista: '2345678', activo: true, updatedAt: new Date().toISOString() },
+      { membershipId: crypto.randomUUID(), equipoId: 'demo-team-2', codigoCensista: '3456789', activo: true, updatedAt: new Date().toISOString() }
     ],
     requests: []
   };
@@ -108,13 +116,18 @@ function saveDemo(data) {
 function demoScope(data, payload = {}) {
   const current = data.users.find((user) => user.codigoCensista === payload.session?.user?.codigoCensista)
     || payload.session?.user || {};
-  const users = current.rol === 'ADMIN'
-    ? data.users
-    : data.users.filter((user) => current.equipo && user.equipo === current.equipo);
+  const teamIds = new Set(current.rol === 'SUPERVISOR'
+    ? (data.teams || []).filter((team) => team.activo && team.coordinadorCodigo === current.codigoCensista).map((team) => team.equipoId)
+    : (data.teamMembers || []).filter((member) => member.activo && member.codigoCensista === current.codigoCensista).map((member) => member.equipoId));
+  const memberCodes = new Set((data.teamMembers || [])
+    .filter((member) => member.activo && teamIds.has(member.equipoId))
+    .map((member) => member.codigoCensista));
+  const users = current.rol === 'ADMIN' ? data.users : data.users.filter((user) =>
+    user.codigoCensista === current.codigoCensista || memberCodes.has(user.codigoCensista));
   const userCodes = new Set(users.map((user) => user.codigoCensista));
-  const assignments = data.assignments.filter((item) => userCodes.has(item.codigoCensista));
+  const assignments = data.assignments.filter((item) => teamIds.has(item.equipoId) || userCodes.has(item.codigoCensista));
   const schoolCodes = new Set(assignments.filter((item) => item.activo).map((item) => item.codigoEscuela));
-  const records = data.records.filter((record) => userCodes.has(record.codigoCensista) && schoolCodes.has(record.codigoEscuela));
+  const records = data.records.filter((record) => teamIds.has(record.equipoId) || userCodes.has(record.codigoCensista));
   const recordKeys = new Set(records.map((record) => record.recordKey || `${record.codigoCensista}:${record.recordId}`));
   const photos = data.photos.filter((photo) => recordKeys.has(photo.recordKey || `${photo.codigoCensista}:${photo.recordId}`));
   return { current, users, userCodes, assignments, schoolCodes, records, recordKeys, photos };
@@ -367,6 +380,17 @@ async function demoRequest(action, payload = {}) {
           ultimaCarga: records.map((record) => record.updatedAt || record.syncedAt || '').sort().pop() || ''
         };
       });
+      const managementTeams = scope.current.rol === 'ADMIN'
+        ? data.teams || []
+        : (data.teams || []).filter((team) => team.coordinadorCodigo === scope.current.codigoCensista);
+      const managementTeamIds = new Set(managementTeams.map((team) => team.equipoId));
+      const allActiveMembershipCodes = new Set((data.teamMembers || [])
+        .filter((member) => member.activo).map((member) => member.codigoCensista));
+      const managementUsers = scope.current.rol === 'ADMIN' ? data.users : data.users.filter((user) =>
+        user.codigoCensista === scope.current.codigoCensista
+          || user.rol === 'ENCUESTADOR' && (!allActiveMembershipCodes.has(user.codigoCensista)
+            || (data.teamMembers || []).some((member) => member.activo
+              && member.codigoCensista === user.codigoCensista && managementTeamIds.has(member.equipoId))));
       return {
         counts: {
           usuarios: dashboardUsers.length,
@@ -379,6 +403,12 @@ async function demoRequest(action, payload = {}) {
         },
         users: dashboardUsers,
         assignments: dashboardAssignments,
+        teams: managementTeams,
+        teamMembers: (data.teamMembers || []).filter((member) => managementTeamIds.has(member.equipoId)),
+        managementUsers,
+        manageableSchoolCodes: scope.current.rol === 'ADMIN'
+          ? []
+          : [...new Set(dashboardAssignments.filter((item) => item.activo).map((item) => item.codigoEscuela))],
         requests: dashboardRequests,
         records: dashboardRecords.slice(-100).reverse(),
         surveyorSummary,
@@ -415,20 +445,30 @@ async function demoRequest(action, payload = {}) {
       saveDemo(data);
       return { ok: true };
     }
+    case 'saveTeamAssignmentsBatch':
+    case 'setAssignmentActive':
     case 'saveAssignmentsBatch': {
-      const items = Array.isArray(payload.assignments) ? payload.assignments : [];
+      const items = action === 'setAssignmentActive'
+        ? [payload.assignment || {}]
+        : (Array.isArray(payload.assignments) ? payload.assignments : []);
       for (const item of items) {
         data.assignments.forEach((assignment) => {
           if (assignment.codigoEscuela === item.codigoEscuela) assignment.activo = false;
         });
-        if (!item.codigoCensista) continue;
+        if (item.activo === false || (!item.codigoCensista && !item.equipoId)) continue;
+        const membership = (data.teamMembers || []).find((member) => member.activo
+          && (item.equipoId ? member.equipoId === item.equipoId : member.codigoCensista === item.codigoCensista));
+        const teamId = item.equipoId || membership?.equipoId || '';
+        const representative = item.codigoCensista || membership?.codigoCensista || '';
+        if (!teamId || !representative) throw new ApiError('El equipo no tiene encuestadores activos.', 'TEAM_WITHOUT_MEMBERS');
         const existing = data.assignments.find((assignment) => assignment.codigoEscuela === item.codigoEscuela
-          && assignment.codigoCensista === item.codigoCensista);
-        if (existing) Object.assign(existing, { activo: true, updatedAt: now });
+          && (assignment.equipoId === teamId || assignment.codigoCensista === representative));
+        if (existing) Object.assign(existing, { codigoCensista: representative, equipoId: teamId, activo: true, updatedAt: now });
         else data.assignments.push({
           assignmentId: crypto.randomUUID(),
-          codigoCensista: item.codigoCensista,
+          codigoCensista: representative,
           codigoEscuela: item.codigoEscuela,
+          equipoId: teamId,
           activo: true,
           fechaAsignacion: now,
           updatedAt: now
@@ -436,6 +476,56 @@ async function demoRequest(action, payload = {}) {
       }
       saveDemo(data);
       return { ok: true, updated: items.length };
+    }
+    case 'saveTeam': {
+      const input = payload.team || {};
+      const id = input.equipoId || crypto.randomUUID();
+      const position = (data.teams || []).findIndex((item) => item.equipoId === id);
+      const team = {
+        equipoId: id,
+        nombre: input.nombre,
+        coordinadorCodigo: input.coordinadorCodigo || payload.session?.user?.codigoCensista || '',
+        notas: input.notas || '',
+        activo: position >= 0 ? data.teams[position].activo !== false : true,
+        createdAt: position >= 0 ? data.teams[position].createdAt : now,
+        updatedAt: now
+      };
+      if (position >= 0) data.teams[position] = { ...data.teams[position], ...team };
+      else data.teams.push(team);
+      saveDemo(data);
+      return { ok: true, equipoId: id };
+    }
+    case 'saveTeamMembers': {
+      const codes = new Set(Array.isArray(payload.codigosCensistas) ? payload.codigosCensistas : []);
+      data.teamMembers = data.teamMembers || [];
+      data.teamMembers.forEach((member) => {
+        if (member.equipoId === payload.equipoId) member.activo = codes.has(member.codigoCensista);
+        else if (codes.has(member.codigoCensista)) member.activo = false;
+      });
+      for (const code of codes) {
+        let member = data.teamMembers.find((item) => item.equipoId === payload.equipoId && item.codigoCensista === code);
+        if (!member) {
+          member = { membershipId: crypto.randomUUID(), equipoId: payload.equipoId, codigoCensista: code };
+          data.teamMembers.push(member);
+        }
+        member.activo = true;
+        member.updatedAt = now;
+        const user = data.users.find((item) => item.codigoCensista === code);
+        const team = data.teams.find((item) => item.equipoId === payload.equipoId);
+        if (user && team) user.equipo = team.nombre;
+      }
+      saveDemo(data);
+      return { ok: true, integrantes: codes.size };
+    }
+    case 'setTeamActive': {
+      const team = (data.teams || []).find((item) => item.equipoId === payload.equipoId);
+      if (!team) throw new ApiError('El equipo no existe.', 'TEAM_NOT_FOUND');
+      team.activo = payload.activo !== false;
+      if (!team.activo) data.assignments.forEach((item) => {
+        if (item.equipoId === team.equipoId) item.activo = false;
+      });
+      saveDemo(data);
+      return { ok: true, activo: team.activo };
     }
     case 'reviewAccess': {
       const request = data.requests.find((item) => item.solicitudId === payload.solicitudId);
@@ -573,6 +663,13 @@ export class ApiClient {
   }
   saveAssignment(assignment) { return this.request('saveAssignment', { assignment }); }
   saveAssignmentsBatch(assignments) { return this.request('saveAssignmentsBatch', { assignments }); }
+  saveTeamAssignmentsBatch(assignments) { return this.request('saveTeamAssignmentsBatch', { assignments }); }
+  setAssignmentActive(assignment) { return this.request('setAssignmentActive', { assignment }); }
+  saveTeam(team) { return this.request('saveTeam', { team }); }
+  saveTeamMembers(equipoId, codigosCensistas) {
+    return this.request('saveTeamMembers', { equipoId, codigosCensistas });
+  }
+  setTeamActive(equipoId, activo) { return this.request('setTeamActive', { equipoId, activo }); }
   reviewAccess(solicitudId, estado, notas = '') {
     return this.request('reviewAccess', { solicitudId, estado, notas });
   }

@@ -10,7 +10,8 @@ function assignmentView_(row, schoolCatalog) {
     fechaAsignacion: row.fecha_asignacion || '',
     asignadoPor: String(row.asignado_por || ''),
     notas: String(row.notas || ''),
-    updatedAt: row.updated_at || ''
+    updatedAt: row.updated_at || '',
+    equipoId: String(row.equipo_id || '')
   };
 }
 function requestView_(row) {
@@ -99,25 +100,33 @@ function recordsPhotosAudit_(records, photos, schoolCatalog) {
 function adminDashboard_(session) {
   requireRole_(session, [ROLE.ADMIN, ROLE.SUPERVISOR]);
   const isAdmin = session.rol === ROLE.ADMIN;
-  const team = isAdmin ? '' : String(session.user.equipo || '').trim();
+  const context = teamContextForCode_(session.codigoCensista);
+  const management = teamManagementData_(session);
   const allUsers = objects_(SHEETS.USERS);
+  const managementCodes = {};
+  management.managementUsers.forEach(function (user) { managementCodes[String(user.codigoCensista)] = true; });
   const users = isAdmin ? allUsers : allUsers.filter(function (user) {
-    return team && String(user.equipo || '').trim() === team;
+    return managementCodes[String(user.codigo_censista || '')];
   });
   const allowedCodes = {};
-  users.forEach(function (user) { allowedCodes[String(user.codigo_censista)] = true; });
+  if (isAdmin) allUsers.forEach(function (user) { allowedCodes[String(user.codigo_censista)] = true; });
+  else Object.keys(context.memberCodes).forEach(function (code) { allowedCodes[code] = true; });
   const assignments = objects_(SHEETS.ASSIGNMENTS).filter(function (item) {
-    return isAdmin || allowedCodes[String(item.codigo_censista)];
+    if (isAdmin) return true;
+    const teamId = String(item.equipo_id || '');
+    return teamId ? Boolean(context.teamIds[teamId]) : Boolean(allowedCodes[String(item.codigo_censista)]);
   });
   const requests = objects_(SHEETS.REQUESTS).filter(function (item) {
     return isAdmin || allowedCodes[String(item.codigo_censista)];
   });
   const records = objects_(SHEETS.RECORDS).filter(function (item) {
-    return isAdmin || allowedCodes[String(item.codigo_censista)];
+    return isAdmin || recordVisibleToContext_(item, context);
   });
   const schoolCatalog = objects_(SHEETS.SCHOOLS);
+  const recordsByKey = {};
+  records.forEach(function (record) { recordsByKey[String(record.record_key || '')] = true; });
   const photos = objects_(SHEETS.PHOTOS).filter(function (photo) {
-    return !photo.deleted_at && (isAdmin || allowedCodes[String(photo.codigo_censista)]);
+    return !photo.deleted_at && (isAdmin || recordsByKey[String(photo.record_key || '')]);
   });
   const dataQuality = recordsPhotosAudit_(records, photos, schoolCatalog);
   const linkedPhotos = linkedActivePhotos_(records, photos);
@@ -142,15 +151,22 @@ function adminDashboard_(session) {
       ultimaCarga: ''
     };
   });
+  const activeMemberships = objects_(SHEETS.TEAM_MEMBERS).filter(function (member) { return active_(member.activo); });
   assignments.filter(function (item) { return active_(item.activo); }).forEach(function (item) {
+    const assignmentTeamId = String(item.equipo_id || '');
     const owner = users.filter(function (user) {
       return String(user.codigo_censista) === String(item.codigo_censista);
     })[0];
     const team = owner ? String(owner.equipo || '').trim() : '';
+    const teamMemberCodes = {};
+    if (assignmentTeamId) activeMemberships.forEach(function (member) {
+      if (String(member.equipo_id || '') === assignmentTeamId) teamMemberCodes[String(member.codigo_censista || '')] = true;
+    });
     users.forEach(function (user) {
       const sameOwner = String(user.codigo_censista) === String(item.codigo_censista);
       const sameTeam = team && String(user.equipo || '').trim() === team;
-      if (!sameOwner && !sameTeam) return;
+      const normalizedMember = assignmentTeamId && teamMemberCodes[String(user.codigo_censista || '')];
+      if (!sameOwner && !sameTeam && !normalizedMember) return;
       const summary = summaryMap[String(user.codigo_censista)];
       if (summary) summary.escuelasAsignadas += 1;
     });
@@ -164,6 +180,18 @@ function adminDashboard_(session) {
     const updated = String(record.updated_at || record.synced_at || '');
     if (updated > summary.ultimaCarga) summary.ultimaCarga = updated;
   });
+  const activeAssignmentTeamBySchool = {};
+  objects_(SHEETS.ASSIGNMENTS).forEach(function (assignment) {
+    if (!active_(assignment.activo)) return;
+    const code = canonicalAppSchoolCode_(assignment.codigo_escuela, schoolCatalog)
+      || String(assignment.codigo_escuela || '');
+    activeAssignmentTeamBySchool[code] = String(assignment.equipo_id || '');
+  });
+  const manageableSchoolCodes = schoolCatalog.filter(function (school) {
+    if (isAdmin) return true;
+    const teamId = activeAssignmentTeamBySchool[String(school.codigo || '')] || '';
+    return !teamId || Boolean(context.teamIds[teamId]);
+  }).map(function (school) { return String(school.codigo || ''); });
   return {
     counts: {
       usuarios: users.length,
@@ -176,6 +204,10 @@ function adminDashboard_(session) {
     },
     users: users.map(publicUser_).sort(function (a, b) { return (a.apellidos + a.nombres).localeCompare(b.apellidos + b.nombres); }),
     assignments: assignments.map(function (row) { return assignmentView_(row, schoolCatalog); }),
+    teams: management.teams,
+    teamMembers: management.teamMembers,
+    managementUsers: management.managementUsers,
+    manageableSchoolCodes: manageableSchoolCodes,
     requests: requests.map(requestView_),
     surveyorSummary: Object.keys(summaryMap).map(function (key) { return summaryMap[key]; })
       .sort(function (a, b) { return b.registros - a.registros || a.apellidos.localeCompare(b.apellidos); }),
@@ -184,7 +216,7 @@ function adminDashboard_(session) {
     }).slice(0, 200).map(recordView_),
     dataQuality: dataQuality,
     photoRootUrl: isAdmin ? configValue_('photo_root_folder_url', '') : '',
-    performance: performanceDashboard_(schoolCatalog, team)
+    performance: performanceDashboard_(schoolCatalog, '', isAdmin ? null : context.teamIds)
   };
 }
 
@@ -192,10 +224,7 @@ function saveUser_(input, session, client) {
   requireRole_(session, [ROLE.ADMIN]);
   const code = digits_(input.codigoCensista, 'codigo de censista', 5, 12);
   const role = requireIn_(input.rol, [ROLE.SURVEYOR, ROLE.SUPERVISOR, ROLE.ADMIN], 'rol');
-  const team = text_(input.equipo, 'equipo', 30, false);
-  if (team && !/^Equipo [1-8]$/.test(team)) {
-    throw apiError_('VALIDATION_ERROR', 'El equipo debe estar entre Equipo 1 y Equipo 8.');
-  }
+  const team = text_(input.equipo, 'equipo', 60, false);
   const existing = objects_(SHEETS.USERS).filter(function (user) {
     return String(user.codigo_censista) === code;
   })[0];
@@ -239,7 +268,7 @@ function setAvailability_(input, session, client) {
     throw apiError_('USER_NOT_FOUND', 'El censista no existe o no esta activo.');
   }
   if (session.rol === ROLE.SUPERVISOR
-      && String(user.equipo || '').trim() !== String(session.user.equipo || '').trim()) {
+      && !teamContextForCode_(session.codigoCensista).memberCodes[code]) {
     throw apiError_('FORBIDDEN', 'Solo puede actualizar integrantes de su propio equipo.');
   }
   const available = input.disponibleCampo !== false;
@@ -260,62 +289,8 @@ function setAvailability_(input, session, client) {
 }
 
 function saveAssignment_(input, session, client) {
-  requireRole_(session, [ROLE.ADMIN, ROLE.SUPERVISOR]);
-  const surveyor = digits_(input.codigoCensista, 'codigo de censista', 5, 12);
-  const requestedSchool = digits_(input.codigoEscuela, 'codigo de escuela', 3, 12);
-  const schoolCatalog = objects_(SHEETS.SCHOOLS);
-  const schoolRow = schoolByAnyCode_(requestedSchool, schoolCatalog);
-  if (!schoolRow) throw apiError_('SCHOOL_NOT_FOUND', 'La escuela no existe.');
-  const school = String(schoolRow.codigo || '');
-  const activate = input.activo !== false;
-  const targetUser = objects_(SHEETS.USERS).filter(function (user) {
-    return String(user.codigo_censista) === surveyor && active_(user.activo);
-  })[0];
-  const userExists = Boolean(targetUser);
-  if (activate && !userExists) throw apiError_('USER_NOT_FOUND', 'El usuario no existe o esta inactivo.');
-  if (session.rol === ROLE.SUPERVISOR) {
-    const supervisorTeam = String(session.user.equipo || '').trim();
-    if (!targetUser || !supervisorTeam || String(targetUser.equipo || '').trim() !== supervisorTeam) {
-      throw apiError_('FORBIDDEN', 'Solo puede asignar integrantes de su propio equipo.');
-    }
-    const allowedSchools = {};
-    activeAssignmentsFor_(session.codigoCensista).forEach(function (assignment) {
-      const allowedCode = canonicalAppSchoolCode_(assignment.codigo_escuela, schoolCatalog)
-        || String(assignment.codigo_escuela);
-      allowedSchools[allowedCode] = true;
-    });
-    if (!allowedSchools[school]) {
-      throw apiError_('FORBIDDEN', 'Solo puede reasignar escuelas que ya pertenecen a su equipo.');
-    }
-  }
-  const key = surveyor + ':' + school;
-  const existing = objects_(SHEETS.ASSIGNMENTS).filter(function (assignment) {
-    const assignedSchool = canonicalAppSchoolCode_(assignment.codigo_escuela, schoolCatalog) || String(assignment.codigo_escuela);
-    return String(assignment.codigo_censista) + ':' + assignedSchool === key;
-  })[0];
-  const now = nowIso_();
-  if (existing) {
-    upsertObject_(SHEETS.ASSIGNMENTS, 'assignment_id', existing.assignment_id, {
-      codigo_escuela: school,
-      activo: input.activo !== false,
-      asignado_por: session.codigoCensista,
-      notas: text_(input.notas, 'notas', 500, false),
-      updated_at: now
-    });
-  } else {
-    appendObject_(SHEETS.ASSIGNMENTS, {
-      assignment_id: Utilities.getUuid(),
-      codigo_censista: surveyor,
-      codigo_escuela: school,
-      activo: input.activo !== false,
-      fecha_asignacion: now,
-      asignado_por: session.codigoCensista,
-      notas: text_(input.notas, 'notas', 500, false),
-      updated_at: now
-    });
-  }
-  audit_(session, 'GUARDAR_ASIGNACION', 'ASIGNACION', key, { activo: input.activo !== false }, client);
-  return { ok: true };
+  const result = saveAssignmentsBatch_([input], session, client);
+  return { ok: true, updated: result.updated };
 }
 
 function saveAssignmentsBatch_(items, session, client) {
@@ -328,45 +303,63 @@ function saveAssignmentsBatch_(items, session, client) {
   }
 
   const schoolCatalog = objects_(SHEETS.SCHOOLS);
-  const supervisorTeam = session.rol === ROLE.SUPERVISOR ? String(session.user.equipo || '').trim() : '';
-  const allowedSchools = {};
-  if (supervisorTeam) {
-    activeAssignmentsFor_(session.codigoCensista).forEach(function (assignment) {
-      const code = canonicalAppSchoolCode_(assignment.codigo_escuela, schoolCatalog)
-        || String(assignment.codigo_escuela);
-      allowedSchools[code] = true;
-    });
-  }
-  const validUsers = {};
-  objects_(SHEETS.USERS).forEach(function (user) {
-    const sameTeam = !supervisorTeam || String(user.equipo || '').trim() === supervisorTeam;
-    if (active_(user.activo) && String(user.rol) !== ROLE.ADMIN && sameTeam) {
-      validUsers[String(user.codigo_censista)] = true;
-    }
-  });
   const seenSchools = {};
   const normalized = items.map(function (item) {
     const requestedSchool = digits_(item.codigoEscuela, 'codigo de escuela', 3, 12);
     const schoolRow = schoolByAnyCode_(requestedSchool, schoolCatalog);
     if (!schoolRow) throw apiError_('SCHOOL_NOT_FOUND', 'La escuela ' + requestedSchool + ' no existe.');
     const school = String(schoolRow.codigo || '');
-    if (supervisorTeam && !allowedSchools[school]) {
-      throw apiError_('FORBIDDEN', 'La escuela ' + school + ' no pertenece al equipo del supervisor.');
-    }
     const surveyor = item.codigoCensista
       ? digits_(item.codigoCensista, 'codigo de censista', 5, 12)
       : '';
+    const teamId = text_(item.equipoId, 'equipo', 100, false);
+    const assignmentId = text_(item.assignmentId, 'asignacion', 100, false);
+    const activate = item.activo !== false && Boolean(teamId || surveyor);
     if (seenSchools[school]) throw apiError_('VALIDATION_ERROR', 'La escuela ' + school + ' esta repetida en el lote.');
-    if (surveyor && !validUsers[surveyor]) {
-      throw apiError_('USER_NOT_FOUND', 'El censista ' + surveyor + ' no existe, esta inactivo o no es personal de campo.');
-    }
     seenSchools[school] = true;
-    return { codigoEscuela: school, codigoCensista: surveyor };
+    return {
+      codigoEscuela: school,
+      codigoCensista: surveyor,
+      equipoId: teamId,
+      assignmentId: assignmentId,
+      activo: activate,
+      notas: text_(item.notas, 'notas', 500, false)
+    };
   });
 
   const lock = LockService.getScriptLock();
   lock.waitLock(30000);
   try {
+    const isSupervisor = session.rol === ROLE.SUPERVISOR;
+    const teams = objects_(SHEETS.TEAMS);
+    const memberships = objects_(SHEETS.TEAM_MEMBERS);
+    const users = objects_(SHEETS.USERS);
+    const activeTeamIds = {};
+    const managedTeamIds = {};
+    teams.forEach(function (team) {
+      const id = String(team.equipo_id || '');
+      if (active_(team.activo)) activeTeamIds[id] = true;
+      if (canManageTeam_(session, team)) managedTeamIds[id] = true;
+    });
+    const teamByUser = {};
+    const membersByTeam = {};
+    memberships.forEach(function (member) {
+      const teamId = String(member.equipo_id || '');
+      const code = String(member.codigo_censista || '');
+      if (!active_(member.activo) || !activeTeamIds[teamId]) return;
+      teamByUser[code] = teamId;
+      if (!membersByTeam[teamId]) membersByTeam[teamId] = [];
+      membersByTeam[teamId].push(code);
+    });
+    const validSurveyors = {};
+    users.forEach(function (user) {
+      if (active_(user.activo) && String(user.rol || '') === ROLE.SURVEYOR) {
+        validSurveyors[String(user.codigo_censista || '')] = true;
+      }
+    });
+    Object.keys(membersByTeam).forEach(function (teamId) {
+      membersByTeam[teamId] = membersByTeam[teamId].filter(function (code) { return validSurveyors[code]; }).sort();
+    });
     const sheet = spreadsheet_().getSheetByName(SHEETS.ASSIGNMENTS);
     const names = headers_(SHEETS.ASSIGNMENTS);
     const indexes = {};
@@ -375,7 +368,19 @@ function saveAssignmentsBatch_(items, session, client) {
     const values = rowCount ? sheet.getRange(2, 1, rowCount, names.length).getValues() : [];
     const now = nowIso_();
 
+    const newRows = [];
     normalized.forEach(function (item) {
+      let teamId = item.equipoId || teamByUser[item.codigoCensista] || '';
+      let surveyor = item.codigoCensista;
+      if (item.activo) {
+        if (!teamId || !activeTeamIds[teamId]) throw apiError_('TEAM_INACTIVE', 'Seleccione un equipo activo para la escuela ' + item.codigoEscuela + '.');
+        if (isSupervisor && !managedTeamIds[teamId]) throw apiError_('FORBIDDEN', 'Solo puede asignar escuelas a equipos bajo su coordinacion.');
+        if (surveyor && teamByUser[surveyor] !== teamId) {
+          throw apiError_('MEMBER_NOT_IN_TEAM', 'El encuestador seleccionado no integra el equipo indicado.');
+        }
+        surveyor = surveyor || (membersByTeam[teamId] || [])[0] || '';
+        if (!surveyor) throw apiError_('TEAM_WITHOUT_MEMBERS', 'El equipo seleccionado no tiene encuestadores activos.');
+      }
       const matching = [];
       values.forEach(function (row, index) {
         const rowSchool = canonicalAppSchoolCode_(row[indexes.codigo_escuela], schoolCatalog)
@@ -385,11 +390,21 @@ function saveAssignmentsBatch_(items, session, client) {
           matching.push(index);
         }
       });
+      matching.forEach(function (index) {
+        const row = values[index];
+        if (!active_(row[indexes.activo])) return;
+        const currentTeamId = String(row[indexes.equipo_id] || teamByUser[String(row[indexes.codigo_censista] || '')] || '');
+        if (isSupervisor && currentTeamId && !managedTeamIds[currentTeamId]) {
+          throw apiError_('FORBIDDEN', 'La escuela ' + item.codigoEscuela + ' pertenece a otro equipo.');
+        }
+      });
       let selected = -1;
-      if (item.codigoCensista) {
+      if (item.activo) {
         for (let position = matching.length - 1; position >= 0; position -= 1) {
           const index = matching[position];
-          if (String(values[index][indexes.codigo_censista] || '') === item.codigoCensista) {
+          const sameAssignment = item.assignmentId && String(values[index][indexes.assignment_id] || '') === item.assignmentId;
+          const sameTeam = String(values[index][indexes.equipo_id] || teamByUser[String(values[index][indexes.codigo_censista] || '')] || '') === teamId;
+          if (sameAssignment || sameTeam || String(values[index][indexes.codigo_censista] || '') === surveyor) {
             selected = index;
             break;
           }
@@ -397,44 +412,57 @@ function saveAssignmentsBatch_(items, session, client) {
       }
       matching.forEach(function (index) {
         const row = values[index];
-        row[indexes.activo] = index === selected;
+        const shouldUpdate = active_(row[indexes.activo]) || index === selected
+          || item.assignmentId && String(row[indexes.assignment_id] || '') === item.assignmentId;
+        if (!shouldUpdate) return;
+        row[indexes.activo] = item.activo && index === selected;
         row[indexes.asignado_por] = session.codigoCensista;
         row[indexes.updated_at] = now;
+        if (index === selected) {
+          row[indexes.codigo_censista] = surveyor;
+          row[indexes.equipo_id] = teamId;
+          if (item.notas) row[indexes.notas] = item.notas;
+        }
       });
-      if (item.codigoCensista && selected < 0) {
+      if (item.activo && selected < 0) {
         const object = {
           assignment_id: Utilities.getUuid(),
-          codigo_censista: item.codigoCensista,
+          codigo_censista: surveyor,
           codigo_escuela: item.codigoEscuela,
           activo: true,
           fecha_asignacion: now,
           asignado_por: session.codigoCensista,
-          notas: 'Asignacion actualizada desde logistica',
-          updated_at: now
+          notas: item.notas || 'Asignacion actualizada desde logistica',
+          updated_at: now,
+          equipo_id: teamId
         };
-        const newRow = names.map(function (name) { return safeCell_(object[name]); });
-        const blankRow = values.findIndex(function (row) {
-          return !row[indexes.assignment_id]
-            && !row[indexes.codigo_censista]
-            && !row[indexes.codigo_escuela];
-        });
-        if (blankRow >= 0) values[blankRow] = newRow;
-        else values.push(newRow);
+        newRows.push(names.map(function (name) { return safeCell_(object[name]); }));
       }
     });
 
-    if (values.length > sheet.getMaxRows() - 1) {
-      sheet.insertRowsAfter(sheet.getMaxRows(), values.length - (sheet.getMaxRows() - 1));
-    }
     if (values.length) sheet.getRange(2, 1, values.length, names.length).setValues(values);
+    if (newRows.length) {
+      const startRow = Math.max(2, sheet.getLastRow() + 1);
+      const requiredRows = startRow + newRows.length - 1;
+      if (requiredRows > sheet.getMaxRows()) sheet.insertRowsAfter(sheet.getMaxRows(), requiredRows - sheet.getMaxRows());
+      sheet.getRange(startRow, 1, newRows.length, names.length).setValues(newRows);
+    }
   } finally {
     lock.releaseLock();
   }
   audit_(session, 'GUARDAR_ASIGNACIONES_LOTE', 'ASIGNACION', 'LOTE', {
     cantidad: normalized.length,
-    sinAsignar: normalized.filter(function (item) { return !item.codigoCensista; }).length
+    inactivadas: normalized.filter(function (item) { return !item.activo; }).length
   }, client);
   return { ok: true, updated: normalized.length };
+}
+
+function saveTeamAssignmentsBatch_(items, session, client) {
+  return saveAssignmentsBatch_(items, session, client);
+}
+
+function setAssignmentActive_(input, session, client) {
+  return saveAssignmentsBatch_([input], session, client);
 }
 
 function reviewAccess_(payload, session, client) {

@@ -344,6 +344,52 @@ test('administra encuestadores y conserva la cuenta principal protegida', async 
   await expect(page.getByLabel('Codigo operativo / cedula')).toHaveAttribute('readonly', '');
 });
 
+test('crea e inactiva equipos sin eliminar su historial', async ({ page }) => {
+  await page.getByRole('button', { name: 'Control' }).click();
+  await page.locator('.operations-tab[data-view="surveyors"]').click();
+  await expect(page.getByRole('heading', { name: 'Gestion de equipos', exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Crear equipo' }).click();
+  const editor = page.locator('.team-editor');
+  await editor.getByLabel('Nombre del equipo').fill('Equipo 9');
+  await editor.getByLabel('Coordinador').selectOption('1234567');
+  await editor.getByLabel('Notas').fill('Prueba de gestion trazable');
+  await editor.getByRole('button', { name: 'Crear equipo' }).click();
+  const card = page.locator('.team-card').filter({ hasText: 'Equipo 9' });
+  await expect(card).toBeVisible();
+  await expect(card).toContainText('Activo');
+
+  page.once('dialog', (dialog) => dialog.accept());
+  await card.getByRole('button', { name: 'Inactivar' }).click();
+  await expect(page.getByText(/Equipo inactivado/)).toBeVisible();
+  await expect(page.locator('.team-card').filter({ hasText: 'Equipo 9' })).toContainText('Inactivo');
+});
+
+test('inactiva y reactiva una asignacion conservando la fila historica', async ({ page }) => {
+  await page.getByRole('button', { name: 'Control' }).click();
+  await page.locator('.operations-tab[data-view="logistics"]').click();
+  await expect(page.getByRole('heading', { name: 'Logistica de campo' })).toBeVisible();
+
+  const row = page.locator('tr').filter({ has: page.locator('[data-logistics-assignment="11007"]') });
+  page.once('dialog', (dialog) => dialog.accept());
+  await row.getByRole('button', { name: 'Inactivar' }).click();
+  await expect(page.getByText('Asignacion inactivada sin eliminar el historial.')).toBeVisible();
+  const storedInactive = await page.evaluate(() => JSON.parse(localStorage.getItem('cialpa-fotos-demo-data-v1'))
+    .assignments.filter((item) => item.codigoEscuela === '11007'));
+  expect(storedInactive).toHaveLength(1);
+  expect(storedInactive[0].activo).toBe(false);
+
+  const refreshedRow = page.locator('tr').filter({ has: page.locator('[data-logistics-assignment="11007"]') });
+  await refreshedRow.locator('[data-logistics-assignment="11007"]').selectOption('2345678');
+  page.once('dialog', (dialog) => dialog.accept());
+  await refreshedRow.getByRole('button', { name: 'Activar' }).click();
+  await expect(page.getByText('Asignacion activada sin eliminar el historial.')).toBeVisible();
+  const storedActive = await page.evaluate(() => JSON.parse(localStorage.getItem('cialpa-fotos-demo-data-v1'))
+    .assignments.filter((item) => item.codigoEscuela === '11007'));
+  expect(storedActive).toHaveLength(1);
+  expect(storedActive[0].activo).toBe(true);
+});
+
 test('planifica, filtra, deshace y guarda asignaciones logisticas', async ({ page }) => {
   await page.getByRole('button', { name: 'Control' }).click();
   await page.locator('.operations-tab[data-view="logistics"]').click();

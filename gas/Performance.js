@@ -22,7 +22,7 @@ function syncDelaySeconds_(row) {
   return Math.min(604800, Math.round((synced - completed) / 1000));
 }
 
-function performanceForMember_(user, records, photos, assignedCount) {
+function performanceForMember_(user, records, photos, assignedCount, teamId, teamName) {
   const code = String(user.codigo_censista || '');
   const ownRecords = records.filter(function (row) {
     return String(row.codigo_censista) === code;
@@ -45,7 +45,8 @@ function performanceForMember_(user, records, photos, assignedCount) {
     codigoCensista: code,
     nombres: String(user.nombres || ''),
     apellidos: String(user.apellidos || ''),
-    equipo: String(user.equipo || ''),
+    equipoId: String(teamId || ''),
+    equipo: String(teamName || user.equipo || ''),
     disponibleCampo: fieldAvailable_(user.disponible_campo),
     motivoIndisponibilidad: String(user.motivo_indisponibilidad || ''),
     assignedSchools: Number(assignedCount || 0),
@@ -63,11 +64,29 @@ function performanceForMember_(user, records, photos, assignedCount) {
   };
 }
 
-function performanceDashboard_(catalog, teamFilter) {
+function performanceDashboard_(catalog, teamFilter, teamIdsFilter) {
   const requestedTeam = String(teamFilter || '').trim();
+  const scopedTeamIds = teamIdsFilter || null;
+  const activeTeams = {};
+  const teamNameById = {};
+  objects_(SHEETS.TEAMS).forEach(function (team) {
+    if (!active_(team.activo)) return;
+    const id = String(team.equipo_id || '');
+    activeTeams[id] = true;
+    teamNameById[id] = String(team.nombre || '');
+  });
+  const teamByUser = {};
+  objects_(SHEETS.TEAM_MEMBERS).forEach(function (member) {
+    const id = String(member.equipo_id || '');
+    if (active_(member.activo) && activeTeams[id]) teamByUser[String(member.codigo_censista || '')] = id;
+  });
   const users = objects_(SHEETS.USERS).filter(function (user) {
+    const normalizedTeamId = teamByUser[String(user.codigo_censista || '')] || '';
+    const normalizedTeamName = teamNameById[normalizedTeamId] || String(user.equipo || '').trim();
     return active_(user.activo) && String(user.rol) === ROLE.SURVEYOR
-      && (!requestedTeam || String(user.equipo || '').trim() === requestedTeam);
+      && (!requestedTeam || normalizedTeamName === requestedTeam)
+      && (!scopedTeamIds || Boolean(scopedTeamIds[normalizedTeamId])
+        || !normalizedTeamId && !Object.keys(activeTeams).length);
   });
   const records = objects_(SHEETS.RECORDS);
   const photos = linkedActivePhotos_(records, objects_(SHEETS.PHOTOS));
@@ -80,34 +99,45 @@ function performanceDashboard_(catalog, teamFilter) {
   const assignedByTeam = {};
   assignments.forEach(function (assignment) {
     const owner = usersByCode[String(assignment.codigo_censista)];
-    const team = owner ? String(owner.equipo || '') : '';
-    if (!assignedByTeam[team]) assignedByTeam[team] = {};
+    const assignmentTeamId = String(assignment.equipo_id || teamByUser[String(assignment.codigo_censista || '')] || '');
+    const teamKey = assignmentTeamId || 'legacy:' + (owner ? String(owner.equipo || '') : '');
+    if (!assignedByTeam[teamKey]) assignedByTeam[teamKey] = {};
     const schoolCode = canonicalAppSchoolCode_(assignment.codigo_escuela, schoolCatalog) || String(assignment.codigo_escuela);
-    assignedByTeam[team][schoolCode] = true;
+    assignedByTeam[teamKey][schoolCode] = true;
   });
   const individuals = users.map(function (user) {
-    const team = String(user.equipo || '');
-    return performanceForMember_(user, records, photos, Object.keys(assignedByTeam[team] || {}).length);
+    const teamId = teamByUser[String(user.codigo_censista || '')] || '';
+    const teamName = teamNameById[teamId] || String(user.equipo || '');
+    const teamKey = teamId || 'legacy:' + teamName;
+    return performanceForMember_(user, records, photos, Object.keys(assignedByTeam[teamKey] || {}).length, teamId, teamName);
   });
-  const teamNames = Object.keys(individuals.reduce(function (result, item) {
-    if (item.equipo) result[item.equipo] = true;
+  const teamKeys = Object.keys(individuals.reduce(function (result, item) {
+    const key = item.equipoId || 'legacy:' + item.equipo;
+    if (item.equipo) result[key] = true;
     return result;
   }, {})).sort();
-  const teams = teamNames.map(function (team) {
-    const members = individuals.filter(function (item) { return item.equipo === team; });
+  const teams = teamKeys.map(function (teamKey) {
+    const teamId = teamKey.indexOf('legacy:') === 0 ? '' : teamKey;
+    const teamName = teamId ? teamNameById[teamId] : teamKey.slice(7);
+    const members = individuals.filter(function (item) {
+      return (item.equipoId || 'legacy:' + item.equipo) === teamKey;
+    });
     const durations = records.filter(function (row) {
       const user = usersByCode[String(row.codigo_censista)];
-      return user && String(user.equipo || '') === team;
+      const recordTeamId = String(row.equipo_id || teamByUser[String(row.codigo_censista || '')] || '');
+      return user && (recordTeamId ? recordTeamId === teamId : String(user.equipo || '') === teamName);
     }).map(validDurationSeconds_).filter(Boolean);
-    const assignedCodes = Object.keys(assignedByTeam[team] || {});
+    const assignedCodes = Object.keys(assignedByTeam[teamKey] || {});
     const touched = {};
     records.forEach(function (row) {
       const user = usersByCode[String(row.codigo_censista)];
       const schoolCode = canonicalAppSchoolCode_(row.codigo_escuela, schoolCatalog) || String(row.codigo_escuela);
-      if (user && String(user.equipo || '') === team) touched[schoolCode] = true;
+      const recordTeamId = String(row.equipo_id || teamByUser[String(row.codigo_censista || '')] || '');
+      if (user && (recordTeamId ? recordTeamId === teamId : String(user.equipo || '') === teamName)) touched[schoolCode] = true;
     });
     return {
-      equipo: team,
+      equipoId: teamId,
+      equipo: teamName,
       members: members,
       totalMembers: members.length,
       availableMembers: members.filter(function (item) { return item.disponibleCampo; }).length,
@@ -132,7 +162,7 @@ function performanceForUser_(code) {
     return item.codigoCensista === String(code);
   })[0] || null;
   const team = individual ? dashboard.teams.filter(function (item) {
-    return item.equipo === individual.equipo;
+    return individual.equipoId ? item.equipoId === individual.equipoId : item.equipo === individual.equipo;
   })[0] || null : null;
   return { generatedAt: dashboard.generatedAt, individual: individual, team: team };
 }

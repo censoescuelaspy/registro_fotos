@@ -1,7 +1,7 @@
 const SYSTEM_CONFIG = Object.freeze({
   APP_NAME: 'CIALPA Fotos',
-  APP_VERSION: '1.8.1',
-  SCHEMA_VERSION: '2026-08-01.2',
+  APP_VERSION: '1.9.0',
+  SCHEMA_VERSION: '2026-08-05.1',
   SPREADSHEET_ID: '1R_vG-q96SbzoYmMg9AL-PMY1YUeSyRTl5tJSfuGNqUo',
   ROOT_FOLDER_NAME: 'CIALPA_REGISTRO_FOTOS',
   SESSION_HOURS: 12,
@@ -12,7 +12,7 @@ const SYSTEM_CONFIG = Object.freeze({
     'http://127.0.0.1:4173',
     'http://localhost:4173'
   ],
-  CACHE_SCHEMA_KEY: 'schema-ready-2026-08-01.2'
+  CACHE_SCHEMA_KEY: 'schema-ready-2026-08-05.1'
 });
 
 const SHEETS = Object.freeze({
@@ -20,6 +20,8 @@ const SHEETS = Object.freeze({
   USERS: 'USUARIOS',
   SESSIONS: 'SESIONES',
   SCHOOLS: 'ESCUELAS',
+  TEAMS: 'EQUIPOS',
+  TEAM_MEMBERS: 'EQUIPO_MIEMBROS',
   ASSIGNMENTS: 'ASIGNACIONES',
   RECORDS: 'REGISTROS',
   PHOTOS: 'FOTOS',
@@ -43,9 +45,17 @@ const HEADERS = Object.freeze({
     'longitud', 'es_muestra', 'orden_muestra', 'estado', 'created_at', 'updated_at',
     'codigo_rue', 'sitio_id', 'codigos_rue_sitio', 'sede_compartida'
   ],
+  EQUIPOS: [
+    'equipo_id', 'nombre', 'coordinador_codigo', 'activo', 'created_at', 'created_by',
+    'updated_at', 'notas'
+  ],
+  EQUIPO_MIEMBROS: [
+    'membership_id', 'equipo_id', 'codigo_censista', 'activo', 'fecha_asignacion',
+    'asignado_por', 'updated_at'
+  ],
   ASIGNACIONES: [
     'assignment_id', 'codigo_censista', 'codigo_escuela', 'activo', 'fecha_asignacion',
-    'asignado_por', 'notas', 'updated_at'
+    'asignado_por', 'notas', 'updated_at', 'equipo_id'
   ],
   REGISTROS: [
     'record_key', 'record_id', 'idempotency_key', 'codigo_escuela', 'codigo_censista',
@@ -53,7 +63,7 @@ const HEADERS = Object.freeze({
     'estado', 'observaciones', 'danos_fallas', 'latitud_captura', 'longitud_captura',
     'precision_m', 'cantidad_fotos', 'cantidad_hojas_papel', 'created_at', 'updated_at',
     'synced_at', 'device_id', 'started_at', 'completed_at', 'duration_seconds',
-    'codigo_rue', 'sitio_id', 'rue_seccion', 'rue_clave_espacio'
+    'codigo_rue', 'sitio_id', 'rue_seccion', 'rue_clave_espacio', 'equipo_id'
   ],
   FOTOS: [
     'foto_id', 'idempotency_key', 'record_key', 'record_id', 'codigo_escuela',

@@ -23,10 +23,10 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 - La galeria se construye con los registros devueltos por el servidor: conserva visibles escuelas historicas aunque ya no formen parte del catalogo estatico de 86 escuelas piloto.
 - Si el servidor no puede verificar los registros o fotografias, **Mi jornada** y **Fotos** mantienen un aviso persistente con el codigo real del error; una falla de lectura no se presenta como una lista vacia valida.
 - Si el dispositivo conserva registros o fotos en la cola local, todas las vistas muestran un aviso persistente con la cantidad pendiente y una accion directa para sincronizar.
-- **Control** consolida escuelas atendidas, registros, fotos, solicitudes, disponibilidad, rendimiento por censista y proyeccion de plazo. El supervisor recibe solo los datos de su equipo; el administrador conserva la vista general.
+- **Control** consolida escuelas atendidas, registros, fotos, solicitudes, disponibilidad, rendimiento por censista y proyeccion de plazo. Cada coordinador recibe solo los datos de los equipos bajo su coordinacion; el administrador conserva la vista general.
 - **Control > Integridad registro–foto** diferencia fotos vinculadas, fotos sin registro y diferencias entre el conteo declarado y la evidencia realmente asociada. El enlace a Drive informa que sus permisos son independientes de la sesion de la app.
-- **Encuestadores** muestra al supervisor su propia lista de integrantes asignados. El administrador puede ver los 16 integrantes de los 8 equipos, crear, editar, activar y desactivar usuarios, mientras la cuenta administrativa principal permanece protegida.
-- **Logistica** administra la distribucion por equipo, filtra por territorio y estado, compara cargas, prepara rutas y guarda asignaciones por lote. Para el supervisor, catalogo, personas y cambios quedan limitados a su equipo.
+- **Encuestadores** incluye **Gestion de equipos**. Administradores y coordinadores pueden crear equipos, asignarles encuestadores y activarlos o inactivarlos; un encuestador solo puede integrar un equipo activo. El administrador tambien puede crear, editar, activar y desactivar usuarios, mientras la cuenta administrativa principal permanece protegida.
+- **Logistica** administra la distribucion por equipo, filtra por territorio y estado, compara cargas, prepara rutas y guarda asignaciones por lote. Cada fila incorpora un boton explicito **Activar / Inactivar / Cambiar**. El coordinador puede operar sus equipos y tomar escuelas sin asignacion, pero no intervenir escuelas activas de otra coordinacion.
 - **Solicitudes** mantiene una bandeja separada por estado para aprobar o rechazar accesos.
 - **Guia de campo** integra las cuatro reglas de control, la secuencia fotografica, la recuperacion sin conexion, los errores criticos y una plantilla copiable para incidencias.
 - El cierre evita marcar **Finalizado** sin GPS y exige explicar en **Observaciones** cualquier registro **Con pendientes**.
@@ -54,7 +54,7 @@ La matriz completa se documenta en `docs/COMPATIBILIDAD_RUE_CIALPA.md`.
 
 La matriz de funcionamiento, respuesta online/offline y contingencias se conserva en `docs/PRUEBAS_CONTINGENCIA_CIALPA_FOTOS_2026-07-25.md`.
 
-Los cambios realizados en **Logistica** son un borrador hasta pulsar **Guardar cambios**. Al confirmar, queda una sola asignacion activa por escuela a nombre del representante operativo del equipo; los dos integrantes del mismo equipo reciben acceso a las mismas escuelas. Las asignaciones anteriores permanecen inactivas como historial.
+Los cambios realizados en **Logistica** son un borrador hasta pulsar **Guardar cambios**, salvo el boton de estado de cada fila, que confirma y aplica inmediatamente la activacion o inactivacion. Queda una sola asignacion activa por escuela a nombre del representante operativo del equipo; todos sus integrantes activos reciben acceso. Las asignaciones anteriores permanecen inactivas como historial y nunca se eliminan desde esta interfaz. Al inactivar un equipo tambien se inactivan sus asignaciones vigentes, sin borrar sus registros.
 
 Ejemplo de identificador:
 

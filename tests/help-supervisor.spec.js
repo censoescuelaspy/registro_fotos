@@ -47,7 +47,9 @@ test('el supervisor ve solo las escuelas y los integrantes de su equipo', async 
   await expect(page.getByText('1', { exact: true }).first()).toBeVisible();
 
   await page.locator('.operations-tab[data-view="surveyors"]').click();
-  await expect(page.getByRole('heading', { name: 'Encuestadores de Equipo 1', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Equipos coordinados', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Gestion de equipos', exact: true })).toBeVisible();
+  await expect(page.getByText('Equipo 1', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Ana Lopez', { exact: true })).toBeVisible();
   await expect(page.locator('.data-table-wrap').getByText('Sofia Supervisora', { exact: true })).toBeVisible();
   await expect(page.getByText('Bruno Diaz', { exact: true })).toHaveCount(0);

@@ -51,6 +51,11 @@ function doPost(event) {
     else if (action === 'setAvailability') data = setAvailability_(payload || {}, session, client);
     else if (action === 'saveAssignment') data = saveAssignment_(payload.assignment || {}, session, client);
     else if (action === 'saveAssignmentsBatch') data = saveAssignmentsBatch_(payload.assignments || [], session, client);
+    else if (action === 'saveTeamAssignmentsBatch') data = saveTeamAssignmentsBatch_(payload.assignments || [], session, client);
+    else if (action === 'setAssignmentActive') data = setAssignmentActive_(payload.assignment || {}, session, client);
+    else if (action === 'saveTeam') data = saveTeam_(payload.team || {}, session, client);
+    else if (action === 'saveTeamMembers') data = saveTeamMembers_(payload || {}, session, client);
+    else if (action === 'setTeamActive') data = setTeamActive_(payload || {}, session, client);
     else if (action === 'reviewAccess') data = reviewAccess_(payload, session, client);
     else throw apiError_('ACTION_NOT_FOUND', 'Accion no reconocida.');
     return response_({ ok: true, data: data }, transport);

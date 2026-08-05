@@ -1,26 +1,20 @@
 function activeTeamMemberCodes_(code) {
-  const users = objects_(SHEETS.USERS);
-  const current = users.filter(function (user) {
-    return String(user.codigo_censista) === String(code) && active_(user.activo);
-  })[0];
-  const team = current ? String(current.equipo || '').trim() : '';
-  const allowedCodes = {};
-  allowedCodes[String(code)] = true;
-  if (team) {
-    users.forEach(function (user) {
-      if (active_(user.activo) && String(user.equipo || '').trim() === team) {
-        allowedCodes[String(user.codigo_censista)] = true;
-      }
-    });
-  }
-  return allowedCodes;
+  return teamContextForCode_(code).memberCodes;
 }
 
 function activeAssignmentsFor_(code) {
-  const allowedCodes = activeTeamMemberCodes_(code);
+  const context = teamContextForCode_(code);
   return objects_(SHEETS.ASSIGNMENTS).filter(function (assignment) {
-    return allowedCodes[String(assignment.codigo_censista)] && active_(assignment.activo);
+    if (!active_(assignment.activo)) return false;
+    const teamId = String(assignment.equipo_id || '');
+    return teamId ? Boolean(context.teamIds[teamId]) : Boolean(context.memberCodes[String(assignment.codigo_censista)]);
   });
+}
+
+function recordVisibleToContext_(row, context) {
+  const teamId = String(row.equipo_id || '');
+  if (teamId) return Boolean(context.teamIds[teamId]);
+  return Boolean(context.memberCodes[String(row.codigo_censista || '')]);
 }
 
 function canonicalRueCode_(value) {
@@ -101,6 +95,7 @@ function recordView_(row) {
     codigoRue: String(row.codigo_rue || canonicalRueCode_(row.codigo_escuela)),
     sitioId: String(row.sitio_id || ''),
     codigoCensista: String(row.codigo_censista || ''),
+    equipoId: String(row.equipo_id || ''),
     numeroFormulario: String(row.numero_formulario || ''),
     numeroHoja: String(row.numero_hoja || ''),
     bloque: String(row.bloque || ''),
@@ -161,10 +156,10 @@ function photoView_(row) {
 function bootstrap_(session) {
   const assignments = activeAssignmentsFor_(session.codigoCensista);
   const showAll = session.rol === ROLE.ADMIN;
-  const teamCodes = activeTeamMemberCodes_(session.codigoCensista);
+  const context = teamContextForCode_(session.codigoCensista);
   const schoolCatalog = objects_(SHEETS.SCHOOLS);
   const records = objects_(SHEETS.RECORDS).filter(function (row) {
-    return showAll || teamCodes[String(row.codigo_censista)];
+    return showAll || recordVisibleToContext_(row, context);
   });
   const progress = {};
   records.forEach(function (record) {
@@ -211,6 +206,9 @@ function validateRecord_(input, session) {
   const rueCode = String(school.codigo_rue || canonicalRueCode_(code));
   const rueSection = rueSectionForSpace_(spaceType);
   if (!rueSection) throw apiError_('VALIDATION_ERROR', 'El tipo de espacio no tiene equivalencia RUE.');
+  const activeAssignment = activeAssignmentsFor_(session.codigoCensista).filter(function (assignment) {
+    return canonicalAppSchoolCode_(assignment.codigo_escuela) === code;
+  })[0];
   return {
     record_key: session.codigoCensista + ':' + expectedId,
     record_id: expectedId,
@@ -241,7 +239,10 @@ function validateRecord_(input, session) {
     codigo_rue: rueCode,
     sitio_id: String(school.sitio_id || ''),
     rue_seccion: rueSection,
-    rue_clave_espacio: rueSpaceKey_(rueCode, rueSection, block, floor, space)
+    rue_clave_espacio: rueSpaceKey_(rueCode, rueSection, block, floor, space),
+    equipo_id: activeAssignment
+      ? String(activeAssignment.equipo_id || teamIdForSurveyor_(session.codigoCensista) || '')
+      : String(teamIdForSurveyor_(session.codigoCensista) || '')
   };
 }
 
@@ -463,13 +464,12 @@ function listRecords_(payload, session) {
   }
   const schoolFilter = schoolFilterRow ? String(schoolFilterRow.codigo || '') : '';
   const requestedSurveyor = payload && payload.codigoCensista ? digits_(payload.codigoCensista, 'codigo de censista', 5, 12) : '';
-  const surveyorFilter = requestedSurveyor && showAll ? requestedSurveyor : (showAll ? '' : session.codigoCensista);
-  const teamCodes = showAll ? {} : activeTeamMemberCodes_(session.codigoCensista);
+  const surveyorFilter = requestedSurveyor && showAll ? requestedSurveyor : '';
+  const context = showAll ? null : teamContextForCode_(session.codigoCensista);
   const records = objects_(SHEETS.RECORDS).filter(function (row) {
     const rowSchoolCode = canonicalAppSchoolCode_(row.codigo_escuela, schoolCatalog) || String(row.codigo_escuela);
-    return (!surveyorFilter || (showAll
-      ? String(row.codigo_censista) === surveyorFilter
-      : teamCodes[String(row.codigo_censista)]))
+    return (!surveyorFilter || String(row.codigo_censista) === surveyorFilter)
+      && (showAll || recordVisibleToContext_(row, context))
       && (!schoolFilter || rowSchoolCode === schoolFilter);
   });
   const keys = {};
@@ -505,7 +505,15 @@ function getPhotoContent_(payload, session) {
     return String(row.foto_id) === fotoId && !row.deleted_at && String(row.estado || 'ACTIVA') === 'ACTIVA';
   })[0];
   if (!photo) throw apiError_('PHOTO_NOT_FOUND', 'La fotografia no existe o ya no esta activa.');
-  requireSchoolAccess_(session, photo.codigo_escuela);
+  if (session.rol !== ROLE.ADMIN) {
+    const record = objects_(SHEETS.RECORDS).filter(function (row) {
+      return String(row.record_key || '') === String(photo.record_key || '');
+    })[0];
+    const context = teamContextForCode_(session.codigoCensista);
+    if (!record || !recordVisibleToContext_(record, context)) {
+      throw apiError_('FORBIDDEN', 'La fotografia no pertenece a un registro visible para su equipo.');
+    }
+  }
   const storedMimeType = String(photo.mime_type || '').toLowerCase();
   if (['image/jpeg', 'image/png', 'image/webp'].indexOf(storedMimeType) < 0) {
     throw apiError_('PHOTO_FORMAT_INVALID', 'El formato de la fotografia no esta permitido.');

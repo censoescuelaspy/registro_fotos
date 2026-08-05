@@ -7,16 +7,18 @@ test('el backend resuelve el codigo RUE y conserva una unica llave interna', () 
   const recordsSource = fs.readFileSync(path.join(process.cwd(), 'gas', 'Records.js'), 'utf8');
   const adminSource = fs.readFileSync(path.join(process.cwd(), 'gas', 'Admin.js'), 'utf8');
   const catalog = [{ codigo: '11007', codigo_rue: '0011007', sitio_id: 'CIALPA-S001' }];
-  const updatedAssignments = [];
-  const appendedAssignments = [];
+  const assignmentHeaders = ['assignment_id', 'codigo_censista', 'codigo_escuela', 'activo', 'fecha_asignacion', 'asignado_por', 'notas', 'updated_at', 'equipo_id'];
+  let assignmentRows = [['A1', '12345', '0011007', true, '', '', '', '', 'T1']];
   const sheets = {
     ESCUELAS: catalog,
-    USUARIOS: [{ codigo_censista: '12345', activo: true }],
-    ASIGNACIONES: [{ assignment_id: 'A1', codigo_censista: '12345', codigo_escuela: '0011007', activo: true }]
+    USUARIOS: [{ codigo_censista: '12345', rol: 'ENCUESTADOR', activo: true }],
+    EQUIPOS: [{ equipo_id: 'T1', nombre: 'Equipo 1', activo: true }],
+    EQUIPO_MIEMBROS: [{ membership_id: 'M1', equipo_id: 'T1', codigo_censista: '12345', activo: true }],
+    ASIGNACIONES: [{ assignment_id: 'A1', codigo_censista: '12345', codigo_escuela: '0011007', activo: true, equipo_id: 'T1' }]
   };
   const context = {
-    SHEETS: { SCHOOLS: 'ESCUELAS', USERS: 'USUARIOS', ASSIGNMENTS: 'ASIGNACIONES' },
-    ROLE: { ADMIN: 'ADMIN', SUPERVISOR: 'SUPERVISOR' },
+    SHEETS: { SCHOOLS: 'ESCUELAS', USERS: 'USUARIOS', ASSIGNMENTS: 'ASIGNACIONES', TEAMS: 'EQUIPOS', TEAM_MEMBERS: 'EQUIPO_MIEMBROS' },
+    ROLE: { ADMIN: 'ADMIN', SUPERVISOR: 'SUPERVISOR', SURVEYOR: 'ENCUESTADOR' },
     objects_: (name) => sheets[name] || [],
     active_: (value) => value === true,
     boolean_: (value) => value === true,
@@ -25,9 +27,23 @@ test('el backend resuelve el codigo RUE y conserva una unica llave interna', () 
     text_: (value) => String(value || ''),
     number_: (value) => Number(value),
     nowIso_: () => '2026-08-01T22:00:00-03:00',
-    upsertObject_: (sheet, key, id, values) => updatedAssignments.push({ sheet, key, id, values }),
-    appendObject_: (sheet, values) => appendedAssignments.push({ sheet, values }),
+    headers_: () => assignmentHeaders,
+    spreadsheet_: () => ({
+      getSheetByName: () => ({
+        getLastRow: () => assignmentRows.length + 1,
+        getMaxRows: () => 100,
+        insertRowsAfter: () => {},
+        getRange: (row, column, rowCount) => ({
+          getValues: () => assignmentRows.map((values) => [...values]),
+          setValues: (values) => { assignmentRows = values.map((rowValues) => [...rowValues]); }
+        })
+      })
+    }),
+    LockService: { getScriptLock: () => ({ waitLock: () => {}, releaseLock: () => {} }) },
+    canManageTeam_: () => true,
     audit_: () => {},
+    apiError_: (code, message) => Object.assign(new Error(message), { apiCode: code }),
+    safeCell_: (value) => value,
     Utilities: { getUuid: () => 'NEW-ID' }
   };
   vm.createContext(context);
@@ -60,10 +76,11 @@ test('el backend resuelve el codigo RUE y conserva una unica llave interna', () 
     { codigoCensista: 'ADMIN', rol: 'ADMIN' },
     {}
   );
-  expect(updatedAssignments).toHaveLength(1);
-  expect(updatedAssignments[0].id).toBe('A1');
-  expect(updatedAssignments[0].values.codigo_escuela).toBe('11007');
-  expect(appendedAssignments).toHaveLength(0);
+  expect(assignmentRows).toHaveLength(1);
+  expect(assignmentRows[0][0]).toBe('A1');
+  expect(assignmentRows[0][2]).toBe('11007');
+  expect(assignmentRows[0][3]).toBe(true);
+  expect(assignmentRows[0][8]).toBe('T1');
 });
 
 test('normaliza las claves RUE y protege el CSV de conciliacion', async ({ page }) => {
@@ -173,6 +190,21 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
     publicUser_: (user) => ({ codigoCensista: user.codigo_censista, rol: user.rol, equipo: user.equipo }),
     performanceForUser_: () => ({ individual: null, team: null })
   };
+  context.teamContextForCode_ = (code) => {
+    const normalized = String(code || '');
+    if (normalized === '5678901' || normalized === '2345678') {
+      return {
+        teamIds: { T1: true },
+        memberCodes: { 5678901: true, 2345678: true },
+        legacyTeam: 'Equipo 1'
+      };
+    }
+    return {
+      teamIds: { T2: true },
+      memberCodes: { 3456789: true },
+      legacyTeam: 'Equipo 2'
+    };
+  };
   vm.createContext(context);
   vm.runInContext(recordsSource, context);
   context.publicUser_ = (user) => ({ codigoCensista: user.codigo_censista, rol: user.rol, equipo: user.equipo });
@@ -207,5 +239,5 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
   expect(firstChunk.totalChunks).toBe(2);
   expect(firstChunk.chunk).toHaveLength(300000);
   expect(firstChunk.chunk + secondChunk.chunk).toBe(Buffer.from(largeBytes).toString('base64'));
-  expect(() => context.getPhotoContent_({ fotoId: 'F2' }, session)).toThrow(/no esta asignada/i);
+  expect(() => context.getPhotoContent_({ fotoId: 'F2' }, session)).toThrow(/no (esta asignada|pertenece a un registro visible)/i);
 });

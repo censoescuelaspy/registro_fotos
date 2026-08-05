@@ -54,6 +54,9 @@
 - Suite completa: `76/76` pruebas aprobadas en Chrome escritorio y Pixel 7 simulado.
 - Prueba intensiva: `300/300` miniaturas abiertas sin error; galeria en 17.691 ms en escritorio y 15.934 ms en movil.
 - El backend productivo quedo desplegado como version inmutable `26` y `health` respondio `ok: true`, version `1.8.1`, esquema `2026-08-01.2` y `bootstrapRequired: false`.
+- Frontend publicado mediante los commits `2d95d72` y `12924f6`; workflows **Publicar GitHub Pages** `31000236099` y **pages build and deployment** `31000235089` completados correctamente.
+- `version.json` publico y la pantalla de acceso mostraron `1.8.1`; consola sin errores ni advertencias y sin desbordamiento horizontal en la comprobacion de escritorio.
+- La validacion demo sobre la URL publica cargo cuatro fotos de una ficha simulada. Se corrigio un detalle de trazabilidad visual para conservar `data-photo-quality="preview"` despues de re-renderizar y la prueba focalizada final aprobo en escritorio y movil (`2/2`).
 
 ### Errores o incidentes
 
@@ -65,7 +68,6 @@
 - Revisar **Mi jornada** en el dispositivo de origen. Si aparece el aviso de cola, mantener la sesion, no borrar datos del navegador y pulsar **Sincronizar ahora** con conexion estable hasta llegar a cero.
 - Si no existen borradores ni operaciones en cola en ese dispositivo, las cargas del 4 de agosto no son recuperables desde el servidor porque nunca llegaron a Sheets ni Drive y deberan repetirse.
 - Queda pendiente la comprobacion autenticada de miniaturas con datos productivos por un usuario autorizado; no se solicito ni registro ningun PIN.
-- La publicacion del frontend y su validacion en GitHub Pages se registraran al completar el workflow.
 
 ## 2026-08-05 07:05 - Visibilidad remota y conciliacion registro-foto v1.8.0
 

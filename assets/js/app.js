@@ -878,7 +878,7 @@ function renderGallery() {
 function renderGalleryPhoto(photo) {
   const cached = state.gallery.content[photo.fotoId];
   const image = cached?.dataUrl
-    ? `<img src="${cached.dataUrl}" alt="${escapeHtml(photo.codigoFoto || 'Fotografia del registro')}" loading="lazy">`
+    ? `<img src="${cached.dataUrl}" data-photo-quality="preview" alt="${escapeHtml(photo.codigoFoto || 'Fotografia del registro')}" loading="lazy">`
     : `<div class="gallery-placeholder">${icon(cached?.error ? 'image-off' : 'loader-circle', 30)}<span>${cached?.error ? 'No se pudo cargar' : 'Cargando imagen...'}</span></div>`;
   return `<article class="gallery-card" data-gallery-photo="${escapeHtml(photo.fotoId)}">
     <button class="gallery-image" data-action="open-gallery-photo" data-photo="${escapeHtml(photo.fotoId)}" aria-label="Ampliar ${escapeHtml(photo.codigoFoto || 'fotografia')}">${image}</button>

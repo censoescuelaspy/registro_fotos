@@ -1,5 +1,72 @@
 # Bitacora
 
+## 2026-08-05 08:03 - Diagnostico de cargas ausentes y galeria optimizada v1.8.1
+
+### Proyecto
+
+- Nombre: CIALPA Fotos.
+- Ruta operativa: copia limpia temporal de `censoescuelaspy/registro_fotos` para preservar el arbol local historico con cambios ajenos.
+- Repositorio: `https://github.com/censoescuelaspy/registro_fotos.git`, rama `main`.
+- URL publica: `https://censoescuelaspy.github.io/registro_fotos/`.
+- Backend: deployment productivo estable de Google Apps Script.
+- Version: frontend/backend `1.8.1`; esquema `2026-08-01.2` sin cambios.
+
+### Objetivo de la intervencion
+
+- Diagnosticar por que la galeria cargaba las fotos con mucha demora.
+- Determinar si las cargas del 4 de agosto de 2026 estaban ocultas por filtros o si no habian llegado al sistema.
+- Reducir el costo de visualizacion sin hacer publica la carpeta privada de Drive y hacer visible toda cola pendiente en el dispositivo.
+
+### Diagnostico inicial
+
+- El libro productivo contenia 7 registros y 11 fotos: 6 registros y 9 fotos del 31 de julio, y 1 registro y 2 fotos del 1 de agosto.
+- Para el 4 de agosto habia 0 registros, 0 filas de fotos y 0 archivos nuevos en la carpeta privada de Drive. La auditoria mostraba un unico inicio de sesion de supervisor, sin acciones `GUARDAR_REGISTRO` ni `SUBIR_FOTO`.
+- Las 11 fotos existentes estaban correctamente vinculadas: 0 huerfanas, 0 registros sin clave y 0 diferencias de conteo. La ausencia del 4 de agosto no era un filtro de galeria ni una falla de conciliacion.
+- La ultima carga recibida por el servidor y el ultimo archivo creado en Drive correspondian al 1 de agosto a las 21:04 hora local.
+- Cada tarjeta de la galeria reconstruia la fotografia original completa. La foto mediana exigia 5 llamadas secuenciales de 300.000 caracteres y el percentil 90 exigia 8; la accion `health` demoraba entre 2,0 y 4,6 segundos por llamada durante la medicion.
+
+### Acciones realizadas
+
+- El backend acepta las variantes privadas `preview` y `original` en `getPhotoContent`.
+- Para `preview`, Google Apps Script obtiene `File.getThumbnail()` y conserva la fotografia original como respaldo cuando Drive no ofrece miniatura.
+- La galeria carga hasta cuatro miniaturas en paralelo y solicita el archivo original solamente cuando el usuario amplia una foto.
+- La respuesta valida variante, tipo MIME, indice y cantidad de fragmentos para impedir mezclas o descargas incompletas.
+- Todas las vistas muestran un aviso persistente cuando IndexedDB conserva operaciones que aun no llegaron al servidor, con estado de error y accion **Sincronizar ahora**.
+- Se actualizaron README, pruebas automatizadas, cache PWA y version visible a `1.8.1`.
+
+### Archivos modificados
+
+- `gas/Config.js`, `gas/Records.js`.
+- `assets/js/api.js`, `assets/js/app.js`, `assets/js/config.js`.
+- `sw.js`, `version.json`, `package.json`, `package-lock.json`, `README.md`.
+- `tests/rue.spec.js`, `tests/smoke.spec.js`, `tests/update.spec.js`, `tests/remote-visibility.spec.js`.
+
+### Comandos o scripts ejecutados
+
+- Consultas de solo lectura a las hojas `REGISTROS`, `FOTOS`, `AUDITORIA` y `SESIONES`, mas inventario recursivo de la carpeta de Drive.
+- Mediciones repetidas del endpoint `health` y calculo de fragmentos segun el tamano real de las 11 fotografias.
+- `node --check`, validacion JSON y `git diff --check`.
+- `npx playwright test --config=playwright.local.config.js --workers=4`, usando Chrome instalado localmente por indisponibilidad temporal de la descarga del navegador empaquetado.
+- `npx clasp push -f`, `npx clasp version` y actualizacion del deployment productivo.
+
+### Resultados verificados
+
+- Suite completa: `76/76` pruebas aprobadas en Chrome escritorio y Pixel 7 simulado.
+- Prueba intensiva: `300/300` miniaturas abiertas sin error; galeria en 17.691 ms en escritorio y 15.934 ms en movil.
+- El backend productivo quedo desplegado como version inmutable `26` y `health` respondio `ok: true`, version `1.8.1`, esquema `2026-08-01.2` y `bootstrapRequired: false`.
+
+### Errores o incidentes
+
+- La primera ejecucion local no encontro el navegador Playwright `1148`; su descarga se interrumpio por timeout de red despues de completar la transferencia. Las pruebas se ejecutaron con Google Chrome ya instalado mediante una configuracion temporal no versionada.
+- No hay evidencia remota que permita reconstruir las supuestas cargas del 4 de agosto. Si fueron finalizadas sin sincronizar, solo pueden permanecer en IndexedDB del mismo dispositivo, navegador y perfil usados en campo.
+
+### Pendientes y riesgos
+
+- Revisar **Mi jornada** en el dispositivo de origen. Si aparece el aviso de cola, mantener la sesion, no borrar datos del navegador y pulsar **Sincronizar ahora** con conexion estable hasta llegar a cero.
+- Si no existen borradores ni operaciones en cola en ese dispositivo, las cargas del 4 de agosto no son recuperables desde el servidor porque nunca llegaron a Sheets ni Drive y deberan repetirse.
+- Queda pendiente la comprobacion autenticada de miniaturas con datos productivos por un usuario autorizado; no se solicito ni registro ningun PIN.
+- La publicacion del frontend y su validacion en GitHub Pages se registraran al completar el workflow.
+
 ## 2026-08-05 07:05 - Visibilidad remota y conciliacion registro-foto v1.8.0
 
 ### Objetivo

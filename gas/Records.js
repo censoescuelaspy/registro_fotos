@@ -497,19 +497,26 @@ function listRecords_(payload, session) {
 
 function getPhotoContent_(payload, session) {
   const fotoId = text_(payload && payload.fotoId, 'identificador de foto', 100, true);
+  const variant = String(payload && payload.variant || 'original').trim().toLowerCase();
+  if (['preview', 'original'].indexOf(variant) < 0) {
+    throw apiError_('VALIDATION_ERROR', 'La variante de fotografia no es valida.');
+  }
   const photo = objects_(SHEETS.PHOTOS).filter(function (row) {
     return String(row.foto_id) === fotoId && !row.deleted_at && String(row.estado || 'ACTIVA') === 'ACTIVA';
   })[0];
   if (!photo) throw apiError_('PHOTO_NOT_FOUND', 'La fotografia no existe o ya no esta activa.');
   requireSchoolAccess_(session, photo.codigo_escuela);
-  const mimeType = String(photo.mime_type || '').toLowerCase();
-  if (['image/jpeg', 'image/png', 'image/webp'].indexOf(mimeType) < 0) {
+  const storedMimeType = String(photo.mime_type || '').toLowerCase();
+  if (['image/jpeg', 'image/png', 'image/webp'].indexOf(storedMimeType) < 0) {
     throw apiError_('PHOTO_FORMAT_INVALID', 'El formato de la fotografia no esta permitido.');
   }
   const driveFileId = text_(photo.drive_file_id, 'archivo de Drive', 200, true);
+  let file;
   let blob;
   try {
-    blob = DriveApp.getFileById(driveFileId).getBlob();
+    file = DriveApp.getFileById(driveFileId);
+    blob = variant === 'preview' ? file.getThumbnail() : file.getBlob();
+    if (!blob) blob = file.getBlob();
   } catch (ignore) {
     throw apiError_('PHOTO_FILE_MISSING', 'El archivo de la fotografia no esta disponible en Drive.');
   }
@@ -518,6 +525,9 @@ function getPhotoContent_(payload, session) {
     throw apiError_('PHOTO_TOO_LARGE', 'La fotografia supera el limite permitido.');
   }
   const base64 = Utilities.base64Encode(bytes);
+  const blobMimeType = String(blob.getContentType ? blob.getContentType() || '' : '').toLowerCase();
+  const mimeType = ['image/jpeg', 'image/png', 'image/webp'].indexOf(blobMimeType) >= 0
+    ? blobMimeType : storedMimeType;
   const chunkSize = 300000;
   const totalChunks = Math.ceil(base64.length / chunkSize);
   const chunkIndex = payload && payload.chunkIndex != null
@@ -525,6 +535,7 @@ function getPhotoContent_(payload, session) {
     : 0;
   return {
     fotoId: fotoId,
+    variant: variant,
     mimeType: mimeType,
     bytes: bytes.length,
     chunkIndex: chunkIndex,

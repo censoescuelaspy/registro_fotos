@@ -335,6 +335,7 @@ async function demoRequest(action, payload = {}) {
       const chunkIndex = Math.max(0, Math.min(totalChunks - 1, Number(payload.chunkIndex || 0)));
       return {
         fotoId: photo.fotoId,
+        variant: payload.variant || 'original',
         mimeType: photo.mimeType || 'image/jpeg',
         bytes: Number(photo.bytes || 0),
         chunkIndex,
@@ -562,7 +563,9 @@ export class ApiClient {
   saveRecord(record) { return this.request('saveRecord', { record }); }
   uploadPhoto(photo, base64) { return this.request('uploadPhoto', { photo, base64 }, { timeout: 90000 }); }
   listRecords(filters = {}) { return this.request('listRecords', filters); }
-  getPhotoContent(fotoId, chunkIndex = 0) { return this.request('getPhotoContent', { fotoId, chunkIndex }, { timeout: 90000 }); }
+  getPhotoContent(fotoId, chunkIndex = 0, variant = 'original') {
+    return this.request('getPhotoContent', { fotoId, chunkIndex, variant }, { timeout: 90000 });
+  }
   adminDashboard() { return this.request('adminDashboard'); }
   saveUser(user) { return this.request('saveUser', { user }); }
   setAvailability(codigoCensista, disponibleCampo, motivoIndisponibilidad = '') {

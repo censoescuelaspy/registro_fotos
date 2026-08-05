@@ -166,7 +166,10 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
     apiError_: (code, message) => Object.assign(new Error(message), { apiCode: code }),
     SYSTEM_CONFIG: { MAX_PHOTO_BYTES: 15 * 1024 * 1024 },
     Utilities: { base64Encode: (bytes) => Buffer.from(bytes).toString('base64') },
-    DriveApp: { getFileById: () => ({ getBlob: () => ({ getBytes: () => [1, 2, 3] }) }) },
+    DriveApp: { getFileById: () => ({
+      getBlob: () => ({ getBytes: () => [1, 2, 3], getContentType: () => 'image/jpeg' }),
+      getThumbnail: () => ({ getBytes: () => [9], getContentType: () => 'image/jpeg' })
+    }) },
     publicUser_: (user) => ({ codigoCensista: user.codigo_censista, rol: user.rol, equipo: user.equipo }),
     performanceForUser_: () => ({ individual: null, team: null })
   };
@@ -191,8 +194,14 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
   expect(listed.schools).toHaveLength(1);
   expect(listed.schools[0]).toMatchObject({ codigo: '11007', codigoRue: '0011007', nombre: 'Escuela Equipo 1' });
   expect(context.getPhotoContent_({ fotoId: 'F1' }, session)).toMatchObject({ fotoId: 'F1', mimeType: 'image/jpeg', chunkIndex: 0, totalChunks: 1, chunk: 'AQID' });
+  expect(context.getPhotoContent_({ fotoId: 'F1', variant: 'preview' }, session)).toMatchObject({
+    fotoId: 'F1', variant: 'preview', mimeType: 'image/jpeg', chunkIndex: 0, totalChunks: 1, chunk: 'CQ=='
+  });
   const largeBytes = Array(225001).fill(7);
-  context.DriveApp.getFileById = () => ({ getBlob: () => ({ getBytes: () => largeBytes }) });
+  context.DriveApp.getFileById = () => ({
+    getBlob: () => ({ getBytes: () => largeBytes, getContentType: () => 'image/jpeg' }),
+    getThumbnail: () => ({ getBytes: () => [9], getContentType: () => 'image/jpeg' })
+  });
   const firstChunk = context.getPhotoContent_({ fotoId: 'F1', chunkIndex: 0 }, session);
   const secondChunk = context.getPhotoContent_({ fotoId: 'F1', chunkIndex: 1 }, session);
   expect(firstChunk.totalChunks).toBe(2);

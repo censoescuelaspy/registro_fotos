@@ -478,6 +478,7 @@ function renderShell() {
     </aside>
     <main class="main-content" id="main-content">
       ${APP_CONFIG.loadTest ? `<div class="load-test-banner">${icon('flask-conical')} <strong>Simulacion de carga:</strong> escuela ficticia 9999001, 75 registros y 300 fotos. No utiliza el libro productivo.</div>` : ''}
+      ${renderSyncQueueNotice()}
       ${renderCurrentView()}
     </main>
     <nav class="bottom-nav" aria-label="Navegacion movil">
@@ -485,6 +486,21 @@ function renderShell() {
         view, iconName, label, true, view === 'admin' && operationsViews.has(state.view)
       )).join('')}
     </nav>`;
+}
+
+function renderSyncQueueNotice() {
+  if (!state.queue.length) return '';
+  const failed = state.queue.filter((item) => item.lastError).length;
+  const detail = failed
+    ? `${failed} operacion${failed === 1 ? '' : 'es'} ${failed === 1 ? 'tuvo' : 'tuvieron'} un error. Abra Mi jornada para revisar el mensaje.`
+    : state.online
+      ? 'Pulse Sincronizar ahora y espere a que la cola llegue a cero antes de cerrar o borrar datos del navegador.'
+      : 'Se enviaran al recuperar la conexion. No cierre sesion ni borre los datos del navegador.';
+  return `<div class="alert ${failed ? 'alert-error' : 'alert-warning'} sync-queue-notice" role="status">
+    ${icon(failed ? 'cloud-alert' : 'cloud-upload')}
+    <span><strong>Este dispositivo conserva ${state.queue.length} operacion${state.queue.length === 1 ? '' : 'es'} que aun no llegaron al servidor.</strong> ${detail}</span>
+    <button class="btn btn-secondary" data-action="sync" ${!state.online || state.syncing ? 'disabled' : ''}>${icon('refresh-cw')} ${state.syncing ? 'Sincronizando...' : 'Sincronizar ahora'}</button>
+  </div>`;
 }
 
 function navButton(view, iconName, label, mobile = false, activeOverride = false) {
@@ -1561,32 +1577,38 @@ async function toggleUser(code, active) {
 async function hydrateGalleryPhotos() {
   const photos = (state.remote?.photos || []).filter((photo) => recordKeyOf(photo) === state.gallery.recordKey);
   const pending = photos.filter((photo) => !state.gallery.content[photo.fotoId]?.dataUrl && !state.gallery.content[photo.fotoId]?.loading);
-  for (let index = 0; index < pending.length; index += 2) {
-    await Promise.all(pending.slice(index, index + 2).map((photo) => loadGalleryPhotoContent(photo)));
+  for (let index = 0; index < pending.length; index += 4) {
+    await Promise.all(pending.slice(index, index + 4).map((photo) => loadGalleryPhotoContent(photo)));
   }
+}
+
+async function downloadGalleryPhoto(photo, variant) {
+  const first = await api.getPhotoContent(photo.fotoId, 0, variant);
+  const mimeType = String(first.mimeType || '').toLowerCase();
+  const totalChunks = Number(first.totalChunks || 0);
+  if (first.variant !== variant || !['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)
+    || !first.chunk || totalChunks < 1 || totalChunks > 100) {
+    throw new Error('El servidor devolvio una imagen no valida.');
+  }
+  const chunks = [first.chunk];
+  for (let chunkIndex = 1; chunkIndex < totalChunks; chunkIndex += 1) {
+    const next = await api.getPhotoContent(photo.fotoId, chunkIndex, variant);
+    if (next.variant !== variant || Number(next.chunkIndex) !== chunkIndex
+      || Number(next.totalChunks) !== totalChunks || !next.chunk) {
+      throw new Error('La descarga de la fotografia quedo incompleta.');
+    }
+    chunks.push(next.chunk);
+  }
+  return `data:${mimeType};base64,${chunks.join('')}`;
 }
 
 async function loadGalleryPhotoContent(photo) {
   state.gallery.content[photo.fotoId] = { loading: true };
   try {
-    const first = await api.getPhotoContent(photo.fotoId, 0);
-    const mimeType = String(first.mimeType || '').toLowerCase();
-    const totalChunks = Number(first.totalChunks || 0);
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType) || !first.chunk || totalChunks < 1 || totalChunks > 100) {
-      throw new Error('El servidor devolvio una imagen no valida.');
-    }
-    const chunks = [first.chunk];
-    for (let chunkIndex = 1; chunkIndex < totalChunks; chunkIndex += 1) {
-      const next = await api.getPhotoContent(photo.fotoId, chunkIndex);
-      if (Number(next.chunkIndex) !== chunkIndex || Number(next.totalChunks) !== totalChunks || !next.chunk) {
-        throw new Error('La descarga de la fotografia quedo incompleta.');
-      }
-      chunks.push(next.chunk);
-    }
-    const dataUrl = `data:${mimeType};base64,${chunks.join('')}`;
+    const dataUrl = await downloadGalleryPhoto(photo, 'preview');
     state.gallery.content[photo.fotoId] = { dataUrl, loading: false };
     const button = document.querySelector(`[data-gallery-photo="${CSS.escape(photo.fotoId)}"] .gallery-image`);
-    if (button) button.innerHTML = `<img src="${dataUrl}" alt="${escapeHtml(photo.codigoFoto || 'Fotografia del registro')}" loading="lazy">`;
+    if (button) button.innerHTML = `<img src="${dataUrl}" data-photo-quality="preview" alt="${escapeHtml(photo.codigoFoto || 'Fotografia del registro')}" loading="lazy">`;
   } catch (error) {
     state.gallery.content[photo.fotoId] = { loading: false, error: error.message || 'No se pudo cargar.' };
     const placeholder = document.querySelector(`[data-gallery-photo="${CSS.escape(photo.fotoId)}"] .gallery-placeholder`);
@@ -1599,7 +1621,7 @@ async function loadGalleryPhotoContent(photo) {
   }
 }
 
-function openGalleryPhoto(fotoId) {
+async function openGalleryPhoto(fotoId) {
   const cached = state.gallery.content[fotoId];
   const photo = (state.remote?.photos || []).find((item) => item.fotoId === fotoId);
   if (!cached?.dataUrl || !photo) {
@@ -1608,12 +1630,27 @@ function openGalleryPhoto(fotoId) {
   }
   const dialog = document.createElement('dialog');
   dialog.className = 'photo-dialog';
-  dialog.innerHTML = `<div class="photo-dialog-bar"><strong>${escapeHtml(photo.codigoFoto || 'Fotografia')}</strong><button class="icon-btn" aria-label="Cerrar">${icon('x')}</button></div><img src="${cached.dataUrl}" alt="${escapeHtml(photo.codigoFoto || 'Fotografia ampliada')}"><p>${escapeHtml(photo.notas || `${elementLabel(photo.tipoElemento)} ${photo.numeroElemento || ''}`)}</p>`;
+  dialog.innerHTML = `<div class="photo-dialog-bar"><strong>${escapeHtml(photo.codigoFoto || 'Fotografia')}</strong><button class="icon-btn" aria-label="Cerrar">${icon('x')}</button></div><img src="${cached.originalDataUrl || cached.dataUrl}" data-photo-quality="${cached.originalDataUrl ? 'original' : 'preview'}" alt="${escapeHtml(photo.codigoFoto || 'Fotografia ampliada')}"><p data-photo-loading>${cached.originalDataUrl ? escapeHtml(photo.notas || `${elementLabel(photo.tipoElemento)} ${photo.numeroElemento || ''}`) : 'Cargando alta resolucion...'}</p>`;
   dialog.querySelector('button').addEventListener('click', () => dialog.close());
   dialog.addEventListener('close', () => dialog.remove());
   document.body.append(dialog);
   dialog.showModal();
   refreshIcons();
+  if (cached.originalDataUrl) return;
+  try {
+    const originalDataUrl = await downloadGalleryPhoto(photo, 'original');
+    const current = state.gallery.content[fotoId] || cached;
+    state.gallery.content[fotoId] = { ...current, originalDataUrl };
+    if (!dialog.isConnected) return;
+    const image = dialog.querySelector('img');
+    image.src = originalDataUrl;
+    image.dataset.photoQuality = 'original';
+    dialog.querySelector('[data-photo-loading]').textContent = photo.notas
+      || `${elementLabel(photo.tipoElemento)} ${photo.numeroElemento || ''}`.trim();
+  } catch (error) {
+    if (!dialog.isConnected) return;
+    dialog.querySelector('[data-photo-loading]').textContent = `No se pudo cargar la alta resolucion: ${error.message || 'error desconocido'}`;
+  }
 }
 
 async function toggleAvailability(code, available) {
@@ -1768,7 +1805,7 @@ async function handleClick(event) {
     state.view = 'photos';
     render();
   }
-  if (action === 'open-gallery-photo') openGalleryPhoto(button.dataset.photo);
+  if (action === 'open-gallery-photo') await openGalleryPhoto(button.dataset.photo);
   if (action === 'retry-gallery-photo') {
     const photo = (state.remote?.photos || []).find((item) => item.fotoId === button.dataset.photo);
     if (photo) {

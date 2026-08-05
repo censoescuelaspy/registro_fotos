@@ -19,8 +19,10 @@ Aplicacion web instalable para registrar fotografias del relevamiento de infraes
 - Los campos, encabezados, indicadores y acciones principales incorporan ayuda emergente **(i)** basada en el manual operativo, accesible con teclado y adaptada a celular.
 - **Mi jornada** muestra avance personal, siguiente escuela, borradores, cola local, registros sincronizados, tiempos por ficha y KPI propios y del equipo.
 - **Fotos** presenta una galeria responsive por escuela y registro. El administrador ve el conjunto general; supervisores y encuestadores ven las escuelas autorizadas para su equipo.
+- La galeria solicita al backend una miniatura privada liviana para cada tarjeta y descarga la fotografia original solamente al ampliarla; los permisos de Drive no se hacen publicos.
 - La galeria se construye con los registros devueltos por el servidor: conserva visibles escuelas historicas aunque ya no formen parte del catalogo estatico de 86 escuelas piloto.
 - Si el servidor no puede verificar los registros o fotografias, **Mi jornada** y **Fotos** mantienen un aviso persistente con el codigo real del error; una falla de lectura no se presenta como una lista vacia valida.
+- Si el dispositivo conserva registros o fotos en la cola local, todas las vistas muestran un aviso persistente con la cantidad pendiente y una accion directa para sincronizar.
 - **Control** consolida escuelas atendidas, registros, fotos, solicitudes, disponibilidad, rendimiento por censista y proyeccion de plazo. El supervisor recibe solo los datos de su equipo; el administrador conserva la vista general.
 - **Control > Integridad registro–foto** diferencia fotos vinculadas, fotos sin registro y diferencias entre el conteo declarado y la evidencia realmente asociada. El enlace a Drive informa que sus permisos son independientes de la sesion de la app.
 - **Encuestadores** muestra al supervisor su propia lista de integrantes asignados. El administrador puede ver los 16 integrantes de los 8 equipos, crear, editar, activar y desactivar usuarios, mientras la cuenta administrativa principal permanece protegida.

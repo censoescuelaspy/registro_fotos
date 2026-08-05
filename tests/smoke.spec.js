@@ -184,9 +184,11 @@ test('permite ver y ampliar las fotos sincronizadas desde la galeria', async ({ 
   await expect(page.getByRole('heading', { name: 'Fotografias por escuela' })).toBeVisible();
   await expect(page.locator('.gallery-card')).toHaveCount(1);
   await expect.poll(() => page.locator('.gallery-image img').evaluate((image) => image.naturalWidth)).toBeGreaterThan(0);
+  await expect(page.locator('.gallery-image img')).toHaveAttribute('data-photo-quality', 'preview');
   await page.locator('.gallery-image').click();
   await expect(page.locator('.photo-dialog')).toBeVisible();
   await expect(page.locator('.photo-dialog img')).toBeVisible();
+  await expect(page.locator('.photo-dialog img')).toHaveAttribute('data-photo-quality', 'original');
 });
 
 test('muestra en la galeria registros de escuelas que no estan en el catalogo estatico', async ({ page }) => {
@@ -384,11 +386,13 @@ test('conserva la ficha offline y la sincroniza al recuperar conexion', async ({
   await page.getByRole('button', { name: /Finalizar y guardar en cola/ }).click();
   await expect(page.getByRole('heading', { name: 'Mi jornada' })).toBeVisible();
   await expect(page.locator('.queue-list .list-card')).toHaveCount(2);
+  await expect(page.locator('.sync-queue-notice')).toContainText('Este dispositivo conserva 2 operaciones que aun no llegaron al servidor.');
   await expect(page.getByText('Registro guardado en la cola local.')).toBeVisible();
 
   await context.setOffline(false);
   await expect(page.getByText('Todo esta sincronizado.')).toBeVisible({ timeout: 10000 });
   await expect(page.locator('.queue-list .list-card')).toHaveCount(0);
+  await expect(page.locator('.sync-queue-notice')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Editar' })).toBeVisible();
 });
 

@@ -36,17 +36,21 @@
 
 ### Publicacion
 
-- `clasp push -f` fue intentado con la cuenta activa `monitorimpactosocial@gmail.com` y rechazado por Google con `The caller does not have permission`; el backend productivo permanece sin cambios.
+- El primer intento de `clasp push -f` con `monitorimpactosocial@gmail.com` fue rechazado por Google con `The caller does not have permission`.
+- Se reautorizo `clasp` como `dmeza.py@gmail.com`, se confirmo acceso a los deployments y se subieron los nueve archivos del backend.
+- Se creo la version inmutable `25` con la descripcion `CIALPA Fotos v1.8.0 - conciliacion registro-foto y visibilidad remota`.
+- El deployment productivo `AKfycbz8RmR-TqSb3FzaLSgMO2NlTTOfRPWuYjSC5ZyXw1Vr5iL-PBYeDIerNvCVj--hNjYk` se actualizo a `@25`, conservando la misma URL `/exec`.
 - Frontend `1.8.0` publicado en `main` mediante los commits `6ff92ef` y `a8e67b7`.
 - Workflow **Publicar GitHub Pages** `30995634931`: finalizado correctamente; `version.json`, configuracion, service worker y aplicacion publica responden con `1.8.0`.
 - Validacion visual en la URL publica: acceso y actualizacion demo, panel **Integridad registro–foto**, consola sin errores ni advertencias y viewport movil de 412 px sin desbordamiento horizontal.
-- Backend publico verificado como operativo, pero todavia en version `1.7.3` y esquema `2026-08-01.2`; no contiene aun las funciones de conciliacion de `1.8.0`.
+- Backend publico verificado despues del despliegue: `ok: true`, version `1.8.0`, esquema `2026-08-01.2` y `bootstrapRequired: false`.
+- Una llamada anonima a `adminDashboard` fue rechazada con `AUTH_REQUIRED`, confirmando que el panel productivo permanece protegido.
 
 ### Riesgos y pendientes
 
 - La validacion autenticada con contenido productivo requiere una cuenta operativa; no se solicitara ni registrara ningun PIN en la bitacora.
-- El despliegue integral requiere autorizar en el proyecto Apps Script a la cuenta activa de `clasp` o volver a autenticar `clasp` con una cuenta que tenga permisos de edicion y deployment.
 - Las fotografias huerfanas se reportan sin borrarlas ni reasignarlas automaticamente para preservar trazabilidad y evitar cambios irreversibles.
+- La publicacion integral de frontend y backend esta completada; queda pendiente solamente la comprobacion funcional autenticada con datos productivos por un usuario autorizado.
 
 ## 2026-08-02 - Actualizacion automatica y version visible v1.7.3
 

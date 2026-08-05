@@ -24,6 +24,7 @@
 - El panel **Control de integridad** informa fotografias huerfanas, registros fuera del catalogo, diferencias de conteo y acceso directo a la carpeta de Drive.
 - Los indicadores administrativos y de rendimiento utilizan fotografias efectivamente vinculadas; las huerfanas quedan separadas como hallazgo de auditoria.
 - Se agregaron pruebas de regresion para fallo remoto visible, escuela historica no catalogada y conciliacion de fotografias huerfanas.
+- El workflow de GitHub Pages incluye explicitamente `version.json`, requerido por la comprobacion automatica y manual de actualizaciones de la PWA.
 - Version de frontend, backend y cache PWA incrementada a `1.8.0`; el esquema de datos permanece en `2026-08-01.2`.
 
 ### Validacion local

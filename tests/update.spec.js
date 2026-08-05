@@ -1,4 +1,5 @@
 const { test, expect } = require('@playwright/test');
+const fs = require('fs');
 
 test('muestra la version y permite buscar actualizaciones antes y despues del acceso', async ({ page }) => {
   await page.goto('/?demo=1');
@@ -21,6 +22,11 @@ test('el service worker invalida la cache anterior, recarga y marca la version a
   expect(source).toContain("const CACHE_VERSION = 'cialpa-fotos-v1.8.0'");
   expect(source).toContain("url.searchParams.set('app_updated', APP_VERSION)");
   expect(source).toContain('client.navigate(url.href)');
+});
+
+test('el workflow publica el manifiesto de version usado por la actualizacion', () => {
+  const workflow = fs.readFileSync('.github/workflows/pages.yml', 'utf8');
+  expect(workflow).toContain('sw.js version.json .nojekyll');
 });
 
 test('aplica una version nueva y avisa al usuario despues de la recarga', async ({ page }) => {

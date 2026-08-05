@@ -173,6 +173,7 @@ p { color: var(--muted); }
 .alert > span { flex: 1; min-width: 170px; }
 .alert .btn { min-height: 32px; margin-left: auto; padding: 5px 9px; }
 .alert-warning { color: #744000; background: var(--amber-100); border: 1px solid #efc56a; }
+.alert-error { color: #8b1e14; background: #fff0ed; border: 1px solid #ef9b8e; }
 .alert-info { color: var(--navy-950); background: var(--navy-100); border: 1px solid #94b8d7; }
 .access-details { margin-top: 18px; border-top: 1px solid var(--line); }
 .access-details summary { padding: 16px 0 2px; color: var(--navy-900); font-weight: 750; cursor: pointer; }

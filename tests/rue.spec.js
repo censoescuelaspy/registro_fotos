@@ -42,6 +42,18 @@ test('el backend resuelve el codigo RUE y conserva una unica llave interna', () 
   expect(context.photoView_({ codigo_escuela: '11007', codigo_rue: '0011007', sitio_id: 'CIALPA-S001' })).toMatchObject({
     codigoEscuela: '11007', codigoRue: '0011007', sitioId: 'CIALPA-S001'
   });
+  const audit = context.recordsPhotosAudit_([
+    { record_key: '12345:R1', record_id: 'R1', codigo_escuela: '11007', cantidad_fotos: 2 },
+    { record_key: '', record_id: 'R2', codigo_escuela: '9999999', cantidad_fotos: 0 }
+  ], [
+    { foto_id: 'F1', record_key: '12345:R1', codigo_escuela: '11007' },
+    { foto_id: 'F2', record_key: 'NO-EXISTE', codigo_escuela: '9999999' }
+  ], catalog);
+  expect(audit).toMatchObject({
+    status: 'REVISAR', recordsTotal: 2, photosTotal: 2, photosLinked: 1, photosOrphaned: 1,
+    recordsWithoutKey: 1, recordsOutsideCatalog: 1, photosOutsideCatalog: 1, countMismatches: 1
+  });
+  expect(audit.samples.orphanPhotos[0].fotoId).toBe('F2');
 
   context.saveAssignment_(
     { codigoCensista: '12345', codigoEscuela: '001-1007', activo: true, notas: '' },
@@ -129,8 +141,8 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
       { codigo_censista: '3456789', codigo_escuela: '10038', activo: true }
     ],
     ESCUELAS: [
-      { codigo: '11007', codigo_rue: '0011007', sitio_id: 'CIALPA-S001' },
-      { codigo: '10038', codigo_rue: '0010038', sitio_id: 'CIALPA-S002' }
+      { codigo: '11007', codigo_rue: '0011007', sitio_id: 'CIALPA-S001', nombre: 'Escuela Equipo 1' },
+      { codigo: '10038', codigo_rue: '0010038', sitio_id: 'CIALPA-S002', nombre: 'Escuela Equipo 2' }
     ],
     REGISTROS: [
       { record_key: '2345678:R1', record_id: 'R1', codigo_censista: '2345678', codigo_escuela: '11007', estado: 'FINALIZADO', cantidad_fotos: 1 },
@@ -176,6 +188,8 @@ test('el backend limita al supervisor a escuelas y registros de su equipo', () =
   expect(listed.records[0].codigoCensista).toBe('2345678');
   expect(listed.photos).toHaveLength(1);
   expect(listed.photos[0].codigoCensista).toBe('2345678');
+  expect(listed.schools).toHaveLength(1);
+  expect(listed.schools[0]).toMatchObject({ codigo: '11007', codigoRue: '0011007', nombre: 'Escuela Equipo 1' });
   expect(context.getPhotoContent_({ fotoId: 'F1' }, session)).toMatchObject({ fotoId: 'F1', mimeType: 'image/jpeg', chunkIndex: 0, totalChunks: 1, chunk: 'AQID' });
   const largeBytes = Array(225001).fill(7);
   context.DriveApp.getFileById = () => ({ getBlob: () => ({ getBytes: () => largeBytes }) });

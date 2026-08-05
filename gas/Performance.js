@@ -70,7 +70,7 @@ function performanceDashboard_(catalog, teamFilter) {
       && (!requestedTeam || String(user.equipo || '').trim() === requestedTeam);
   });
   const records = objects_(SHEETS.RECORDS);
-  const photos = objects_(SHEETS.PHOTOS);
+  const photos = linkedActivePhotos_(records, objects_(SHEETS.PHOTOS));
   const assignments = objects_(SHEETS.ASSIGNMENTS).filter(function (item) {
     return active_(item.activo);
   });

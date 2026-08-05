@@ -419,6 +419,40 @@ function syncRecordPhotoCounts_(recordKey) {
   });
 }
 
+function linkedActivePhotos_(records, photos) {
+  const recordKeys = {};
+  (records || []).forEach(function (record) {
+    const key = String(record.record_key || record.recordKey || '').trim();
+    if (key) recordKeys[key] = true;
+  });
+  return (photos || []).filter(function (photo) {
+    const key = String(photo.record_key || photo.recordKey || '').trim();
+    return key && recordKeys[key] && !(photo.deleted_at || photo.deletedAt);
+  });
+}
+
+function recordSchoolView_(school, fallbackCode) {
+  const code = String(school ? school.codigo || '' : fallbackCode || '').replace(/\D/g, '');
+  const rueCode = String(school ? school.codigo_rue || school.codigoRue || '' : '').replace(/\D/g, '')
+    || canonicalRueCode_(code);
+  const sharedRueCodes = String(school ? school.codigos_rue_sitio || school.codigosRueSitio || '' : '')
+    .split('|').map(function (item) { return String(item || '').trim(); }).filter(Boolean);
+  return {
+    codigo: code,
+    codigoRue: rueCode,
+    sitioId: String(school ? school.sitio_id || school.sitioId || '' : ''),
+    codigosRueSitio: sharedRueCodes.length ? sharedRueCodes : (rueCode ? [rueCode] : []),
+    sedeCompartida: school ? boolean_(school.sede_compartida || school.sedeCompartida) : false,
+    nombre: String(school ? school.nombre || '' : '') || 'Escuela no catalogada ' + code,
+    departamento: String(school ? school.departamento || '' : ''),
+    distrito: String(school ? school.distrito || '' : ''),
+    zona: String(school ? school.zona || '' : ''),
+    localidad: String(school ? school.localidad || '' : ''),
+    latitud: school && school.latitud !== '' ? Number(school.latitud) : '',
+    longitud: school && school.longitud !== '' ? Number(school.longitud) : ''
+  };
+}
+
 function listRecords_(payload, session) {
   const showAll = session.rol === ROLE.ADMIN;
   const schoolCatalog = objects_(SHEETS.SCHOOLS);
@@ -439,11 +473,26 @@ function listRecords_(payload, session) {
       && (!schoolFilter || rowSchoolCode === schoolFilter);
   });
   const keys = {};
-  records.forEach(function (row) { keys[String(row.record_key)] = true; });
-  const photos = objects_(SHEETS.PHOTOS).filter(function (row) {
-    return keys[String(row.record_key)] && !row.deleted_at;
+  records.forEach(function (row) {
+    const key = String(row.record_key || '').trim();
+    if (key) keys[key] = true;
   });
-  return { records: records.map(recordView_), photos: photos.map(photoView_) };
+  const photos = objects_(SHEETS.PHOTOS).filter(function (row) {
+    const key = String(row.record_key || '').trim();
+    return key && keys[key] && !row.deleted_at;
+  });
+  const schoolCodes = {};
+  records.forEach(function (row) {
+    const school = schoolByAnyCode_(row.codigo_escuela, schoolCatalog);
+    const code = String(school ? school.codigo || '' : row.codigo_escuela || '').replace(/\D/g, '');
+    if (code) schoolCodes[code] = school || null;
+  });
+  const schools = Object.keys(schoolCodes).map(function (code) {
+    return recordSchoolView_(schoolCodes[code], code);
+  }).sort(function (left, right) {
+    return left.nombre.localeCompare(right.nombre);
+  });
+  return { records: records.map(recordView_), photos: photos.map(photoView_), schools: schools };
 }
 
 function getPhotoContent_(payload, session) {

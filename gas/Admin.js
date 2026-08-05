@@ -28,6 +28,74 @@ function requestView_(row) {
   };
 }
 
+function recordsPhotosAudit_(records, photos, schoolCatalog) {
+  const keys = {};
+  const linkedCounts = {};
+  const recordsWithoutKey = [];
+  const recordsOutsideCatalog = [];
+  const photosOutsideCatalog = [];
+  const orphanPhotos = [];
+  (records || []).forEach(function (record) {
+    const key = String(record.record_key || record.recordKey || '').trim();
+    if (key) keys[key] = record;
+    else recordsWithoutKey.push(record);
+    if (!canonicalAppSchoolCode_(record.codigo_escuela || record.codigoEscuela, schoolCatalog)) {
+      recordsOutsideCatalog.push(record);
+    }
+  });
+  (photos || []).forEach(function (photo) {
+    const key = String(photo.record_key || photo.recordKey || '').trim();
+    if (key && keys[key]) linkedCounts[key] = (linkedCounts[key] || 0) + 1;
+    else orphanPhotos.push(photo);
+    if (!canonicalAppSchoolCode_(photo.codigo_escuela || photo.codigoEscuela, schoolCatalog)) {
+      photosOutsideCatalog.push(photo);
+    }
+  });
+  const countMismatches = (records || []).filter(function (record) {
+    const key = String(record.record_key || record.recordKey || '').trim();
+    return Number(record.cantidad_fotos || record.cantidadFotos || 0) !== Number(linkedCounts[key] || 0);
+  });
+  const issues = recordsWithoutKey.length + recordsOutsideCatalog.length + photosOutsideCatalog.length
+    + orphanPhotos.length + countMismatches.length;
+  return {
+    status: issues ? 'REVISAR' : 'OK',
+    recordsTotal: (records || []).length,
+    photosTotal: (photos || []).length,
+    photosLinked: (photos || []).length - orphanPhotos.length,
+    photosOrphaned: orphanPhotos.length,
+    recordsWithoutKey: recordsWithoutKey.length,
+    recordsOutsideCatalog: recordsOutsideCatalog.length,
+    photosOutsideCatalog: photosOutsideCatalog.length,
+    countMismatches: countMismatches.length,
+    generatedAt: nowIso_(),
+    samples: {
+      orphanPhotos: orphanPhotos.slice(0, 10).map(function (photo) {
+        return {
+          fotoId: String(photo.foto_id || photo.fotoId || ''),
+          recordKey: String(photo.record_key || photo.recordKey || ''),
+          codigoEscuela: String(photo.codigo_escuela || photo.codigoEscuela || '')
+        };
+      }),
+      recordsOutsideCatalog: recordsOutsideCatalog.slice(0, 10).map(function (record) {
+        return {
+          recordKey: String(record.record_key || record.recordKey || ''),
+          recordId: String(record.record_id || record.recordId || ''),
+          codigoEscuela: String(record.codigo_escuela || record.codigoEscuela || '')
+        };
+      }),
+      countMismatches: countMismatches.slice(0, 10).map(function (record) {
+        const key = String(record.record_key || record.recordKey || '').trim();
+        return {
+          recordKey: key,
+          recordId: String(record.record_id || record.recordId || ''),
+          declaredPhotos: Number(record.cantidad_fotos || record.cantidadFotos || 0),
+          linkedPhotos: Number(linkedCounts[key] || 0)
+        };
+      })
+    }
+  };
+}
+
 function adminDashboard_(session) {
   requireRole_(session, [ROLE.ADMIN, ROLE.SUPERVISOR]);
   const isAdmin = session.rol === ROLE.ADMIN;
@@ -51,8 +119,10 @@ function adminDashboard_(session) {
   const photos = objects_(SHEETS.PHOTOS).filter(function (photo) {
     return !photo.deleted_at && (isAdmin || allowedCodes[String(photo.codigo_censista)]);
   });
+  const dataQuality = recordsPhotosAudit_(records, photos, schoolCatalog);
+  const linkedPhotos = linkedActivePhotos_(records, photos);
   const photoCounts = {};
-  photos.forEach(function (photo) {
+  linkedPhotos.forEach(function (photo) {
     const key = String(photo.codigo_censista);
     photoCounts[key] = (photoCounts[key] || 0) + 1;
   });
@@ -99,7 +169,9 @@ function adminDashboard_(session) {
       usuarios: users.length,
       asignaciones: assignments.filter(function (item) { return active_(item.activo); }).length,
       registros: records.length,
-      fotos: photos.length,
+      fotos: linkedPhotos.length,
+      fotosTotales: photos.length,
+      fotosHuerfanas: dataQuality.photosOrphaned,
       solicitudesPendientes: requests.filter(function (item) { return String(item.estado) === 'PENDIENTE'; }).length
     },
     users: users.map(publicUser_).sort(function (a, b) { return (a.apellidos + a.nombres).localeCompare(b.apellidos + b.nombres); }),
@@ -110,6 +182,7 @@ function adminDashboard_(session) {
     records: records.sort(function (a, b) {
       return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
     }).slice(0, 200).map(recordView_),
+    dataQuality: dataQuality,
     photoRootUrl: isAdmin ? configValue_('photo_root_folder_url', '') : '',
     performance: performanceDashboard_(schoolCatalog, team)
   };

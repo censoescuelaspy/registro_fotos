@@ -189,6 +189,58 @@ test('permite ver y ampliar las fotos sincronizadas desde la galeria', async ({ 
   await expect(page.locator('.photo-dialog img')).toBeVisible();
 });
 
+test('muestra en la galeria registros de escuelas que no estan en el catalogo estatico', async ({ page }) => {
+  await page.evaluate(() => {
+    const key = 'cialpa-fotos-demo-data-v1';
+    const data = JSON.parse(localStorage.getItem(key));
+    data.records.push({
+      recordKey: '1234567:9998123-B01-P00-E001-H01',
+      recordId: '9998123-B01-P00-E001-H01',
+      codigoCensista: '1234567',
+      codigoEscuela: '9998123',
+      codigoRue: '9998123',
+      bloque: '1', piso: '0', espacio: '1', numeroHoja: '1',
+      estado: 'FINALIZADO', cantidadFotos: 0,
+      updatedAt: new Date().toISOString()
+    });
+    localStorage.setItem(key, JSON.stringify(data));
+    localStorage.removeItem('cialpa-fotos-records-cache-v1');
+  });
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Escuelas asignadas' })).toBeVisible();
+  await page.locator('[data-view="photos"]:visible').first().click();
+  await expect(page.getByRole('heading', { name: 'Fotografias por escuela' })).toBeVisible();
+  await expect(page.locator('[data-gallery-school] option[value="9998123"]')).toHaveCount(1);
+  await page.locator('[data-gallery-school]').selectOption('9998123');
+  await expect(page.locator('.gallery-summary')).toContainText('Escuela no catalogada 9998123');
+  await expect(page.locator('[data-gallery-record]')).toHaveValue('1234567:9998123-B01-P00-E001-H01');
+});
+
+test('separa fotos vinculadas y fotos sin registro en el control administrativo', async ({ page }) => {
+  await page.evaluate(() => {
+    const key = 'cialpa-fotos-demo-data-v1';
+    const data = JSON.parse(localStorage.getItem(key));
+    const recordKey = '1234567:11007-B01-P00-E001-H01';
+    data.records.push({
+      recordKey,
+      recordId: '11007-B01-P00-E001-H01',
+      codigoCensista: '1234567', codigoEscuela: '11007',
+      estado: 'FINALIZADO', cantidadFotos: 1, updatedAt: new Date().toISOString()
+    });
+    data.photos.push(
+      { fotoId: 'FOTO-VINCULADA', recordKey, codigoCensista: '1234567', codigoEscuela: '11007' },
+      { fotoId: 'FOTO-HUERFANA', recordKey: 'REGISTRO-INEXISTENTE', codigoCensista: '1234567', codigoEscuela: '11007' }
+    );
+    localStorage.setItem(key, JSON.stringify(data));
+  });
+  await page.locator('[data-view="admin"]:visible').first().click();
+  await expect(page.getByRole('heading', { name: 'Integridad registro–foto' })).toBeVisible();
+  await expect(page.locator('.data-quality-panel')).toContainText('FOTO-HUERFANA');
+  await expect(page.locator('.data-quality-panel')).toContainText('REVISAR');
+  await expect(page.locator('.admin-summary')).toContainText('Fotos vinculadas');
+  await expect(page.locator('.admin-summary')).toContainText('1 sin registro');
+});
+
 test('muestra Editar para un registro antiguo con codigo numerico y sin recordKey', async ({ page }) => {
   await page.locator('[data-action="select-school"]').first().click();
   await page.locator('[data-action="start-record"]').click();

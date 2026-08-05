@@ -125,7 +125,53 @@ function demoPhotoView(photo) {
   return metadata;
 }
 
+function demoRecordKey(item) {
+  return String(item.recordKey || (item.codigoCensista && item.recordId ? `${item.codigoCensista}:${item.recordId}` : '')).trim();
+}
+
+function demoLinkedPhotos(records = [], photos = []) {
+  const keys = new Set(records.map(demoRecordKey).filter(Boolean));
+  return photos.filter((photo) => keys.has(demoRecordKey(photo)));
+}
+
+function demoDataQuality(records = [], photos = []) {
+  const keys = new Set(records.map(demoRecordKey).filter(Boolean));
+  const linked = demoLinkedPhotos(records, photos);
+  const linkedCounts = linked.reduce((counts, photo) => {
+    const key = demoRecordKey(photo);
+    counts[key] = (counts[key] || 0) + 1;
+    return counts;
+  }, {});
+  const orphanPhotos = photos.filter((photo) => !keys.has(demoRecordKey(photo)));
+  const countMismatches = records.filter((record) => Number(record.cantidadFotos || 0) !== Number(linkedCounts[demoRecordKey(record)] || 0));
+  const recordsWithoutKey = records.filter((record) => !demoRecordKey(record));
+  const issues = recordsWithoutKey.length + orphanPhotos.length + countMismatches.length;
+  return {
+    status: issues ? 'REVISAR' : 'OK',
+    recordsTotal: records.length,
+    photosTotal: photos.length,
+    photosLinked: linked.length,
+    photosOrphaned: orphanPhotos.length,
+    recordsWithoutKey: recordsWithoutKey.length,
+    recordsOutsideCatalog: 0,
+    photosOutsideCatalog: 0,
+    countMismatches: countMismatches.length,
+    generatedAt: new Date().toISOString(),
+    samples: {
+      orphanPhotos: orphanPhotos.slice(0, 10).map((photo) => ({ fotoId: photo.fotoId || '', recordKey: demoRecordKey(photo), codigoEscuela: photo.codigoEscuela || '' })),
+      recordsOutsideCatalog: [],
+      countMismatches: countMismatches.slice(0, 10).map((record) => ({
+        recordKey: demoRecordKey(record),
+        recordId: record.recordId || '',
+        declaredPhotos: Number(record.cantidadFotos || 0),
+        linkedPhotos: Number(linkedCounts[demoRecordKey(record)] || 0)
+      }))
+    }
+  };
+}
+
 function demoPerformance(data, teamFilter = '') {
+  const linkedPhotos = demoLinkedPhotos(data.records, data.photos);
   const individuals = data.users.filter((user) => user.rol === 'ENCUESTADOR' && (!teamFilter || user.equipo === teamFilter)).map((user) => {
     const records = data.records.filter((record) => record.codigoCensista === user.codigoCensista);
     const durations = records.map((record) => Number(record.durationSeconds || 0)).filter((value) => value > 0);
@@ -143,7 +189,7 @@ function demoPerformance(data, teamFilter = '') {
       completedRecords: completed,
       pendingRecords: records.filter((record) => record.estado === 'CON_PENDIENTES').length,
       completionRate: records.length ? Math.round(completed / records.length * 1000) / 10 : 0,
-      photos: data.photos.filter((photo) => photo.codigoCensista === user.codigoCensista).length,
+      photos: linkedPhotos.filter((photo) => photo.codigoCensista === user.codigoCensista).length,
       timedRecords: durations.length,
       averageMinutes: Math.round(average * 10) / 10,
       medianMinutes: Math.round(median * 10) / 10,
@@ -275,8 +321,8 @@ async function demoRequest(action, payload = {}) {
       {
         const scope = demoScope(data, payload);
         return scope.current.rol === 'ADMIN'
-          ? { records: data.records, photos: data.photos.map(demoPhotoView) }
-          : { records: scope.records, photos: scope.photos.map(demoPhotoView) };
+          ? { records: data.records, photos: data.photos.map(demoPhotoView), schools: [] }
+          : { records: scope.records, photos: scope.photos.map(demoPhotoView), schools: [] };
       }
     case 'getPhotoContent': {
       const scope = demoScope(data, payload);
@@ -303,6 +349,8 @@ async function demoRequest(action, payload = {}) {
       const dashboardAssignments = scope.current.rol === 'ADMIN' ? data.assignments : scope.assignments;
       const dashboardRecords = scope.current.rol === 'ADMIN' ? data.records : scope.records;
       const dashboardPhotos = scope.current.rol === 'ADMIN' ? data.photos : scope.photos;
+      const linkedPhotos = demoLinkedPhotos(dashboardRecords, dashboardPhotos);
+      const dataQuality = demoDataQuality(dashboardRecords, dashboardPhotos);
       const dashboardRequests = scope.current.rol === 'ADMIN'
         ? data.requests
         : data.requests.filter((request) => scope.userCodes.has(request.codigoCensista));
@@ -314,7 +362,7 @@ async function demoRequest(action, payload = {}) {
           registros: records.length,
           finalizados: records.filter((record) => record.estado === 'FINALIZADO').length,
           conPendientes: records.filter((record) => record.estado === 'CON_PENDIENTES').length,
-          fotos: dashboardPhotos.filter((photo) => photo.codigoCensista === user.codigoCensista).length,
+          fotos: linkedPhotos.filter((photo) => photo.codigoCensista === user.codigoCensista).length,
           ultimaCarga: records.map((record) => record.updatedAt || record.syncedAt || '').sort().pop() || ''
         };
       });
@@ -323,7 +371,9 @@ async function demoRequest(action, payload = {}) {
           usuarios: dashboardUsers.length,
           asignaciones: dashboardAssignments.filter((item) => item.activo).length,
           registros: dashboardRecords.length,
-          fotos: dashboardPhotos.length,
+          fotos: linkedPhotos.length,
+          fotosTotales: dashboardPhotos.length,
+          fotosHuerfanas: dataQuality.photosOrphaned,
           solicitudesPendientes: dashboardRequests.filter((item) => item.estado === 'PENDIENTE').length
         },
         users: dashboardUsers,
@@ -331,6 +381,7 @@ async function demoRequest(action, payload = {}) {
         requests: dashboardRequests,
         records: dashboardRecords.slice(-100).reverse(),
         surveyorSummary,
+        dataQuality,
         photoRootUrl: '',
         performance: demoPerformance(data, scope.current.rol === 'ADMIN' ? '' : scope.current.equipo)
       };

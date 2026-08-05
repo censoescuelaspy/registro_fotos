@@ -1,5 +1,5 @@
-const CACHE_VERSION = 'cialpa-fotos-v1.7.3';
-const APP_VERSION = '1.7.3';
+const CACHE_VERSION = 'cialpa-fotos-v1.8.0';
+const APP_VERSION = '1.8.0';
 const SHELL_CACHE = `${CACHE_VERSION}-shell`;
 const STATIC_ASSETS = [
   './',

@@ -59,7 +59,8 @@ const state = {
   activeDraft: null,
   drafts: [],
   queue: [],
-  remote: { records: [], photos: [] },
+  remote: { records: [], photos: [], schools: [] },
+  remoteStatus: { source: 'initial', stale: false, error: null, updatedAt: '' },
   gallery: { schoolCode: '', recordKey: '', content: {} },
   admin: null,
   adminLoading: false,
@@ -241,15 +242,15 @@ async function loadBootstrap(allowCache = false) {
     state.bootstrap = normalizeBootstrapSchoolCodes(await api.bootstrap());
     saveJson('cialpa-fotos-bootstrap-cache-v1', state.bootstrap);
   } catch (error) {
-    if (allowCache && cached) {
-      state.bootstrap = normalizeBootstrapSchoolCodes(cached);
-      toast('Sin conexion: se muestran las asignaciones guardadas en este celular.', 'info');
-      return;
-    }
     if (['AUTH_REQUIRED', 'SESSION_EXPIRED', 'AUTH_INVALID'].includes(error.code)) {
       setSession(null);
       state.bootstrap = null;
       toast('La sesion vencio. Ingrese nuevamente.', 'error');
+      return;
+    }
+    if (allowCache && cached) {
+      state.bootstrap = normalizeBootstrapSchoolCodes(cached);
+      toast('No se pudieron actualizar las asignaciones. Se muestra la copia guardada en este celular.', 'warning', 7000);
       return;
     }
     throw error;
@@ -258,29 +259,77 @@ async function loadBootstrap(allowCache = false) {
 
 async function loadRemoteRecords(allowCache = false) {
   const user = state.bootstrap?.user || state.session?.user;
-  if (!user) return;
+  if (!user) return { source: 'none', stale: false, error: null, updatedAt: '' };
   const cached = loadJson(APP_CONFIG.recordsCacheKey);
+  const cachedForUser = cached?.codigoCensista === user.codigoCensista ? cached : null;
   if (allowCache && !navigator.onLine) {
-    state.remote = cached?.codigoCensista === user.codigoCensista
-      ? cached.data || { records: [], photos: [] }
-      : { records: [], photos: [] };
+    state.remote = cachedForUser?.data || { records: [], photos: [], schools: [] };
     state.remote = normalizeRemoteSchoolCodes(state.remote);
-    return;
+    state.remoteStatus = {
+      source: cachedForUser ? 'cache' : 'empty',
+      stale: true,
+      error: { code: 'OFFLINE', message: cachedForUser
+        ? 'Sin conexion: se muestran los datos guardados en este dispositivo.'
+        : 'Sin conexion y sin una copia local: no se pudieron verificar los registros del servidor.' },
+      updatedAt: String(cachedForUser?.updatedAt || '')
+    };
+    return state.remoteStatus;
   }
   try {
     state.remote = normalizeRemoteSchoolCodes(await api.listRecords());
-    saveJson(APP_CONFIG.recordsCacheKey, { codigoCensista: user.codigoCensista, data: state.remote });
+    state.remoteStatus = { source: 'remote', stale: false, error: null, updatedAt: new Date().toISOString() };
+    saveJson(APP_CONFIG.recordsCacheKey, {
+      codigoCensista: user.codigoCensista,
+      data: state.remote,
+      updatedAt: state.remoteStatus.updatedAt
+    });
+    return state.remoteStatus;
   } catch (error) {
-    if (allowCache && cached?.codigoCensista === user.codigoCensista) {
-      state.remote = normalizeRemoteSchoolCodes(cached.data || { records: [], photos: [] });
-      return;
+    if (['AUTH_REQUIRED', 'SESSION_EXPIRED', 'AUTH_INVALID'].includes(error.code)) {
+      setSession(null);
+      state.bootstrap = null;
+      state.remote = { records: [], photos: [], schools: [] };
+      state.remoteStatus = {
+        source: 'error',
+        stale: true,
+        error: { code: String(error.code || 'AUTH_REQUIRED'), message: error.message || 'La sesion ya no es valida.' },
+        updatedAt: ''
+      };
+      throw error;
     }
     if (allowCache) {
-      state.remote = { records: [], photos: [] };
-      return;
+      state.remote = normalizeRemoteSchoolCodes(cachedForUser?.data || { records: [], photos: [], schools: [] });
+      state.remoteStatus = {
+        source: cachedForUser ? 'cache' : 'empty',
+        stale: true,
+        error: {
+          code: String(error.code || 'SERVER_ERROR'),
+          message: cachedForUser
+            ? `No se pudo actualizar desde el servidor: ${error.message || 'error desconocido'}. Se muestra la copia local.`
+            : `No se pudieron verificar los registros del servidor: ${error.message || 'error desconocido'}.`
+        },
+        updatedAt: String(cachedForUser?.updatedAt || '')
+      };
+      return state.remoteStatus;
     }
+    state.remoteStatus = {
+      source: 'error',
+      stale: true,
+      error: { code: String(error.code || 'SERVER_ERROR'), message: error.message || 'No se pudo consultar el servidor.' },
+      updatedAt: String(cachedForUser?.updatedAt || '')
+    };
     throw error;
   }
+}
+
+function renderRemoteStatusNotice() {
+  const status = state.remoteStatus || {};
+  if (!status.error) return '';
+  const lastUpdate = status.updatedAt ? ` Ultima lectura correcta: ${formatDateTime(status.updatedAt)}.` : '';
+  return `<div class="alert ${status.source === 'cache' ? 'alert-warning' : 'alert-error'} remote-status-alert" role="alert">
+    ${icon(status.source === 'cache' ? 'database-backup' : 'cloud-alert')}
+    <span><strong>Datos remotos no verificados.</strong> ${escapeHtml(status.error.message)}${escapeHtml(lastUpdate)} Codigo: ${escapeHtml(status.error.code || 'ERROR')}.</span>
+  </div>`;
 }
 
 function render() {
@@ -466,6 +515,33 @@ function availableSchools() {
   if (state.bootstrap.showAllSchools) return state.catalog;
   const assigned = new Set((state.bootstrap.assignedCodes || []).map(canonicalSchoolCode));
   return state.catalog.filter((school) => assigned.has(school.codigo));
+}
+
+function remoteSchoolByCode(code) {
+  return findSchoolByCode(state.remote?.schools || [], code) || schoolByCode(code);
+}
+
+function gallerySchools(records = state.remote?.records || []) {
+  const recordCodes = new Set(records.map((record) => canonicalSchoolCode(record.codigoEscuela)).filter(Boolean));
+  const schools = new Map();
+  availableSchools().forEach((school) => schools.set(canonicalSchoolCode(school.codigo), school));
+  (state.remote?.schools || []).forEach((school) => {
+    const code = canonicalSchoolCode(school.codigo || school.codigoRue);
+    if (code) schools.set(code, { ...(schools.get(code) || {}), ...school, codigo: code });
+  });
+  records.forEach((record) => {
+    const code = canonicalSchoolCode(record.codigoEscuela);
+    if (!code || schools.has(code)) return;
+    schools.set(code, {
+      codigo: code,
+      codigoRue: record.codigoRue || normalizeRueSchoolCode(code),
+      sitioId: record.sitioId || '',
+      nombre: `Escuela no catalogada ${code}`,
+      departamento: '', distrito: '', zona: '', localidad: ''
+    });
+  });
+  return [...schools.values()].filter((school) => recordCodes.has(canonicalSchoolCode(school.codigo)))
+    .sort((left, right) => String(left.nombre || '').localeCompare(String(right.nombre || ''), 'es'));
 }
 
 function filteredSchools() {
@@ -698,6 +774,7 @@ function renderPending() {
   const nextSchool = candidates[0] || null;
   return `<section class="view">
     <div class="view-heading"><div><p class="eyebrow">Trabajo de campo</p><h1>Mi jornada</h1><p>${schools.length} escuelas asignadas · ${remoteRecords.length} registros sincronizados · ${state.queue.length} operaciones en cola</p></div><div class="button-row"><button class="btn btn-secondary" data-action="locate-journal">${icon('locate-fixed')} Ordenar por cercania</button><button class="btn btn-secondary" data-action="reload-records">${icon('rotate-cw')} Actualizar</button><button class="btn btn-primary" data-action="sync" ${!state.queue.length || state.syncing ? 'disabled' : ''}>${icon('refresh-cw')} ${state.syncing ? 'Sincronizando...' : 'Sincronizar ahora'}</button></div></div>
+    ${renderRemoteStatusNotice()}
     <div class="summary-strip">
       <div><span>Asignadas</span><strong>${schools.length}</strong></div>
       <div><span>Finalizadas</span><strong>${finalizadas}</strong></div>
@@ -719,7 +796,9 @@ function renderPending() {
     </section>
     <section class="content-section">
       <div class="section-heading"><div><h2>Registros sincronizados</h2><p>Puede reabrir un registro propio para agregar evidencia sin perder su numeracion.</p></div></div>
-      <div class="draft-list">${remoteRecords.length ? remoteRecords.map(renderSyncedRecordRow).join('') : renderEmpty('notebook-tabs', 'Aun no hay registros sincronizados.', 'Los registros recibidos por el servidor apareceran aqui.')}</div>
+      <div class="draft-list">${remoteRecords.length ? remoteRecords.map(renderSyncedRecordRow).join('') : state.remoteStatus?.error
+        ? renderEmpty('cloud-alert', 'No se pudieron verificar los registros sincronizados.', 'Revise el aviso anterior y pulse Actualizar para volver a consultar el servidor.')
+        : renderEmpty('notebook-tabs', 'Aun no hay registros sincronizados.', 'Los registros recibidos por el servidor apareceran aqui.')}</div>
     </section>
   </section>`;
 }
@@ -736,7 +815,7 @@ function renderQueueRow(item) {
 }
 
 function renderSyncedRecordRow(record) {
-  const school = schoolByCode(record.codigoEscuela);
+  const school = remoteSchoolByCode(record.codigoEscuela);
   const own = isOwnRecord(record);
   const recordKey = recordKeyOf(record);
   const actions = `<div class="list-card-actions">
@@ -750,7 +829,7 @@ function renderSyncedRecordRow(record) {
 
 function renderGallery() {
   const records = state.remote?.records || [];
-  const schools = availableSchools().filter((school) => records.some((record) => record.codigoEscuela === school.codigo));
+  const schools = gallerySchools(records);
   const fallbackSchool = state.selectedSchoolCode && schools.some((school) => school.codigo === state.selectedSchoolCode)
     ? state.selectedSchoolCode : schools[0]?.codigo || '';
   if (!schools.some((school) => school.codigo === state.gallery.schoolCode)) state.gallery.schoolCode = fallbackSchool;
@@ -762,14 +841,18 @@ function renderGallery() {
   const selectedRecord = schoolRecords.find((record) => recordKeyOf(record) === state.gallery.recordKey);
   const photos = (state.remote?.photos || []).filter((photo) => recordKeyOf(photo) === state.gallery.recordKey)
     .sort((left, right) => Number(left.secuencia || 0) - Number(right.secuencia || 0));
-  const selectedSchool = schoolByCode(state.gallery.schoolCode);
+  const selectedSchool = schools.find((school) => school.codigo === state.gallery.schoolCode)
+    || remoteSchoolByCode(state.gallery.schoolCode);
   return `<section class="view view-gallery">
     <div class="view-heading"><div><p class="eyebrow">Evidencia sincronizada</p><h1>Fotografias por escuela</h1><p>Disponible para administradores, supervisores y encuestadores dentro de su ambito autorizado.</p></div><button class="btn btn-secondary" data-action="reload-gallery">${icon('rotate-cw')} Actualizar</button></div>
+    ${renderRemoteStatusNotice()}
     <div class="gallery-filters">
       <label>Escuela<select data-gallery-school>${schools.map((school) => `<option value="${school.codigo}" ${school.codigo === state.gallery.schoolCode ? 'selected' : ''}>RUE ${escapeHtml(school.codigoRue || normalizeRueSchoolCode(school.codigo))} Â· ${escapeHtml(school.nombre)}</option>`).join('')}</select></label>
       <label>Registro<select data-gallery-record ${schoolRecords.length ? '' : 'disabled'}>${schoolRecords.map((record) => `<option value="${escapeHtml(recordKeyOf(record))}" ${recordKeyOf(record) === state.gallery.recordKey ? 'selected' : ''}>${escapeHtml(record.recordId)} Â· ${record.cantidadFotos || 0} fotos</option>`).join('')}</select></label>
     </div>
-    ${!schools.length ? renderEmpty('images', 'Aun no hay fotografias sincronizadas.', 'Cuando se sincronicen registros con fotos apareceran aqui.') : `
+    ${!schools.length ? state.remoteStatus?.error
+      ? renderEmpty('cloud-alert', 'No se pudieron verificar las fotografias sincronizadas.', 'Revise el aviso anterior y pulse Actualizar para volver a consultar el servidor.')
+      : renderEmpty('images', 'Aun no hay fotografias sincronizadas.', 'Cuando se sincronicen registros con fotos apareceran aqui.') : `
       <section class="gallery-summary"><div><h2>${escapeHtml(selectedSchool?.nombre || state.gallery.schoolCode)}</h2><p>${selectedRecord ? `${escapeHtml(selectedRecord.recordId)} Â· ${statusLabel(selectedRecord.estado)} Â· censista ${escapeHtml(String(selectedRecord.codigoCensista || ''))}` : 'Seleccione un registro.'}</p></div><strong>${photos.length} ${photos.length === 1 ? 'foto' : 'fotos'}</strong></section>
       <div class="gallery-grid">${photos.length ? photos.map(renderGalleryPhoto).join('') : renderEmpty('image-off', 'Este registro no tiene fotos activas.', 'Actualice la vista si la carga acaba de sincronizarse.')}</div>
     `}
@@ -851,6 +934,26 @@ function renderAdminTabs(activeView) {
   return `<nav class="operations-tabs" aria-label="Modulos de control">${tabs.map(([view, iconName, label]) => `<button class="operations-tab ${activeView === view ? 'is-active' : ''}" data-view="${view}" ${activeView === view ? 'aria-current="page"' : ''}>${icon(iconName, 17)}<span>${label}</span>${view === 'requests' && pending ? `<b>${pending}</b>` : ''}</button>`).join('')}</nav>`;
 }
 
+function renderDataQuality(dataQuality = {}) {
+  const status = dataQuality.status === 'OK' ? 'OK' : 'REVISAR';
+  const samples = dataQuality.samples || {};
+  const orphanSamples = (samples.orphanPhotos || []).map((item) => escapeHtml(item.fotoId || item.recordKey || 'Foto sin identificador')).join(', ');
+  const mismatchSamples = (samples.countMismatches || []).map((item) => `${escapeHtml(item.recordId || item.recordKey || 'Registro')}: ${Number(item.declaredPhotos || 0)} declaradas / ${Number(item.linkedPhotos || 0)} vinculadas`).join('; ');
+  return `<section class="content-section data-quality-panel">
+    <div class="section-heading"><div><h2>Integridad registro–foto</h2><p>Conciliacion automatica por clave de registro. Solo las fotos vinculadas se contabilizan como evidencia operativa.</p></div><span class="status-pill ${status === 'OK' ? 'status-finalizado' : 'status-con_pendientes'}">${status}</span></div>
+    <div class="summary-strip compatibility-summary">
+      <div><span>Registros</span><strong>${Number(dataQuality.recordsTotal || 0)}</strong></div>
+      <div><span>Fotos vinculadas</span><strong>${Number(dataQuality.photosLinked || 0)}</strong><small>Con registro existente</small></div>
+      <div><span>Fotos sin registro</span><strong>${Number(dataQuality.photosOrphaned || 0)}</strong><small>Requieren conciliacion</small></div>
+      <div><span>Conteos diferentes</span><strong>${Number(dataQuality.countMismatches || 0)}</strong><small>Declaradas vs. vinculadas</small></div>
+    </div>
+    <div class="alert ${status === 'OK' ? 'alert-info' : 'alert-warning'}">${icon(status === 'OK' ? 'badge-check' : 'triangle-alert')}<span>${status === 'OK'
+      ? 'No se detectaron fotos huerfanas ni diferencias entre los conteos declarados y las evidencias vinculadas.'
+      : `Se detectaron incidencias: ${Number(dataQuality.recordsWithoutKey || 0)} registros sin clave, ${Number(dataQuality.recordsOutsideCatalog || 0)} registros fuera del catalogo, ${Number(dataQuality.photosOutsideCatalog || 0)} fotos fuera del catalogo y ${Number(dataQuality.photosOrphaned || 0)} fotos sin registro.${orphanSamples ? ` Muestra de fotos: ${orphanSamples}.` : ''}${mismatchSamples ? ` Diferencias: ${mismatchSamples}.` : ''}`}</span></div>
+    <div class="alert alert-info">${icon('folder-key')}<span>El acceso a la carpeta de Google Drive depende de sus permisos de Drive y es independiente del acceso a esta aplicacion.</span></div>
+  </section>`;
+}
+
 function renderAdmin() {
   if (!operationsAllowed()) return renderOperationsGuard();
   if (!state.admin) return renderOperationsLoading('Control');
@@ -863,15 +966,16 @@ function renderAdmin() {
   const completedSchools = catalog.filter((school) => schoolStatus(progress, school.codigo) === 'FINALIZADO').length;
   const teamName = String((state.bootstrap?.user || {}).equipo || '');
   return `<section class="view operations-view">
-    <div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>${supervisorMode() ? `Resumen de ${escapeHtml(teamName || 'mi equipo')}` : 'Resumen general'}</h1><p>${supervisorMode() ? 'Escuelas, encuestadores y avance asignados exclusivamente a su equipo.' : 'Avance consolidado del relevamiento fotografico.'}</p></div><div class="button-row"><button class="btn btn-primary" data-action="export-rue" ${state.rueExporting ? 'disabled' : ''}>${icon('file-down')} ${state.rueExporting ? 'Preparando...' : 'Conciliar con RUE'}</button>${state.admin.photoRootUrl ? `<a class="btn btn-secondary" href="${escapeHtml(state.admin.photoRootUrl)}" target="_blank" rel="noopener">${icon('folder-open')} Abrir fotos</a>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
+    <div class="view-heading"><div><p class="eyebrow">Control operativo</p><h1>${supervisorMode() ? `Resumen de ${escapeHtml(teamName || 'mi equipo')}` : 'Resumen general'}</h1><p>${supervisorMode() ? 'Escuelas, encuestadores y avance asignados exclusivamente a su equipo.' : 'Avance consolidado del relevamiento fotografico.'}</p></div><div class="button-row"><button class="btn btn-primary" data-action="export-rue" ${state.rueExporting ? 'disabled' : ''}>${icon('file-down')} ${state.rueExporting ? 'Preparando...' : 'Conciliar con RUE'}</button>${state.admin.photoRootUrl ? `<a class="btn btn-secondary" href="${escapeHtml(state.admin.photoRootUrl)}" target="_blank" rel="noopener">${icon('folder-open')} Abrir carpeta en Drive</a>` : ''}<button class="btn btn-secondary" data-action="reload-admin">${icon('refresh-cw')} Actualizar</button></div></div>
     ${renderAdminTabs('admin')}
     <div class="summary-strip admin-summary">
       <div><span>Escuelas finalizadas</span><strong>${completedSchools}/${catalog.length}</strong></div>
       <div><span>Encuestadores activos</span><strong>${(state.admin.users || []).filter((item) => item.activo && item.rol === 'ENCUESTADOR').length}</strong></div>
       <div><span>Registros</span><strong>${counts.registros || 0}</strong></div>
-      <div><span>Fotos</span><strong>${counts.fotos || 0}</strong></div>
+      <div><span>Fotos vinculadas</span><strong>${counts.fotos || 0}</strong><small>${Number(counts.fotosHuerfanas || 0)} sin registro</small></div>
       <div><span>Solicitudes pendientes</span><strong>${counts.solicitudesPendientes || 0}</strong></div>
     </div>
+    ${renderDataQuality(state.admin.dataQuality)}
     <section class="content-section rue-compatibility-panel">
       <div class="section-heading"><div><h2>Compatibilidad RUE</h2><p>Contrato RUE–CIALPA 1.0: conserva la clave interna y agrega el codigo RUE de siete digitos, la sede fisica y la equivalencia de bloque, planta y espacio.</p></div><a class="btn btn-secondary" href="https://demo.mec.gov.py/demo_rue/infraestructuras_fiscalizaciones_v2/index" target="_blank" rel="noopener">${icon('external-link')} Abrir RUE demo</a></div>
       <div class="summary-strip compatibility-summary">
@@ -1238,10 +1342,14 @@ async function login(form) {
   const session = await api.login(data);
   setSession(session);
   await loadBootstrap();
-  await loadRemoteRecords(true);
+  const remoteStatus = await loadRemoteRecords(true);
   state.view = 'schools';
   render();
-  toast(`Bienvenido, ${displayName(state.bootstrap?.user || session.user)}.`, 'success');
+  if (remoteStatus?.error) {
+    toast('Ingreso correcto, pero los datos remotos no pudieron verificarse. Revise el aviso y vuelva a intentar.', 'warning', 8000);
+  } else {
+    toast(`Bienvenido, ${displayName(state.bootstrap?.user || session.user)}.`, 'success');
+  }
   syncQueue({ quiet: true });
 }
 
@@ -1670,9 +1778,14 @@ async function handleClick(event) {
   }
   if (action === 'reload-gallery') {
     state.gallery.content = {};
-    await loadRemoteRecords(true);
-    render();
-    toast('Fotografias actualizadas.', 'success');
+    try {
+      await loadRemoteRecords(false);
+      render();
+      toast('Fotografias actualizadas.', 'success');
+    } catch (error) {
+      render();
+      throw error;
+    }
   }
   if (action === 'save-draft') await saveActiveDraft();
   if (action === 'capture-photo') {
@@ -1688,9 +1801,14 @@ async function handleClick(event) {
   if (action === 'delete-draft') await deleteDraft(button.dataset.draft);
   if (action === 'sync') await syncQueue();
   if (action === 'reload-records') {
-    await loadRemoteRecords(true);
-    render();
-    toast('Registros actualizados.', 'success');
+    try {
+      await loadRemoteRecords(false);
+      render();
+      toast('Registros actualizados.', 'success');
+    } catch (error) {
+      render();
+      throw error;
+    }
   }
   if (action === 'reload-admin') await loadAdmin(true);
   if (action === 'new-user') {
@@ -2065,10 +2183,23 @@ function normalizeRemoteSchoolCodes(data = {}) {
     const key = recordKeyOf(item);
     return (key && recordKeys.has(key)) || allowedSchools.has(item.codigoEscuela);
   });
+  const recordCodes = new Set(records.map((record) => record.codigoEscuela).filter(Boolean));
+  const schools = (data.schools || []).map((school) => {
+    const code = canonicalSchoolCode(school.codigo || school.codigoRue);
+    const catalogSchool = schoolByCode(code);
+    return {
+      ...(catalogSchool || {}),
+      ...school,
+      codigo: code,
+      codigoRue: school.codigoRue || catalogSchool?.codigoRue || normalizeRueSchoolCode(code),
+      sitioId: school.sitioId || catalogSchool?.sitioId || ''
+    };
+  }).filter((school) => school.codigo && recordCodes.has(school.codigo));
   return {
     ...data,
     records,
-    photos
+    photos,
+    schools
   };
 }
 
@@ -2104,6 +2235,8 @@ function normalizeAdminSchoolCodes(data = {}) {
       asignaciones: scopedAssignments.filter((item) => item.activo !== false).length,
       registros: records.length,
       fotos: surveyorSummary.reduce((sum, item) => sum + Number(item.fotos || 0), 0),
+      fotosTotales: Number(data.counts?.fotosTotales || 0),
+      fotosHuerfanas: Number(data.dataQuality?.photosOrphaned || data.counts?.fotosHuerfanas || 0),
       solicitudesPendientes: requests.filter((item) => item.estado === 'PENDIENTE').length
     },
     users,

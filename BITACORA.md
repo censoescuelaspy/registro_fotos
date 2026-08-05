@@ -1,5 +1,49 @@
 # Bitacora
 
+## 2026-08-05 - Visibilidad remota y conciliacion registro-foto v1.8.0
+
+### Objetivo
+
+- Evitar que una falla del backend se presente al usuario como una galeria o jornada validamente vacia.
+- Mostrar registros historicos de escuelas que todavia no formen parte del catalogo piloto estatico.
+- Conciliar registros y fotografias antes de calcular indicadores y dejar visibles las inconsistencias para administracion.
+
+### Diagnostico inicial
+
+- La carga de registros podia capturar un error remoto y continuar con listas vacias, produciendo un falso estado de exito.
+- La galeria intersectaba los registros recibidos con las 86 escuelas estaticas del piloto y ocultaba escuelas historicas fuera de ese catalogo.
+- El tablero y el rendimiento contaban toda fotografia activa, incluso archivos sin `record_key` valido o vinculados a un registro inexistente.
+- La interfaz no diferenciaba claramente entre la cantidad declarada por el registro y la cantidad de fotografias efectivamente vinculadas.
+
+### Acciones realizadas
+
+- `listRecords` incorpora metadatos de las escuelas realmente presentes en los registros visibles para el usuario.
+- La aplicacion conserva un estado remoto explicito y muestra alertas persistentes ante errores, cache sin confirmar o autenticacion vencida.
+- La galeria deriva sus escuelas de los registros del servidor y admite una etiqueta segura para codigos historicos no catalogados.
+- El backend vincula fotografias solo cuando existe un `record_key` no vacio y correspondiente a un registro visible.
+- El panel **Control de integridad** informa fotografias huerfanas, registros fuera del catalogo, diferencias de conteo y acceso directo a la carpeta de Drive.
+- Los indicadores administrativos y de rendimiento utilizan fotografias efectivamente vinculadas; las huerfanas quedan separadas como hallazgo de auditoria.
+- Se agregaron pruebas de regresion para fallo remoto visible, escuela historica no catalogada y conciliacion de fotografias huerfanas.
+- Version de frontend, backend y cache PWA incrementada a `1.8.0`; el esquema de datos permanece en `2026-08-01.2`.
+
+### Validacion local
+
+- Pruebas focalizadas en Chrome escritorio y Pixel 7 simulado: `10/10` aprobadas.
+- Suite Playwright completa en Chrome escritorio y Pixel 7 simulado: `74/74` aprobadas.
+- Sintaxis JavaScript, archivos JSON y `git diff --check`: aprobados sin errores.
+- Prueba de carga con 300 fotografias: aprobada en ambos perfiles, sin regresiones funcionales.
+
+### Publicacion
+
+- `clasp push -f` fue intentado con la cuenta activa `monitorimpactosocial@gmail.com` y rechazado por Google con `The caller does not have permission`; el backend productivo permanece sin cambios.
+- Frontend `1.8.0`: pendiente de commit, push a `main` y verificacion de GitHub Pages.
+
+### Riesgos y pendientes
+
+- La validacion autenticada con contenido productivo requiere una cuenta operativa; no se solicitara ni registrara ningun PIN en la bitacora.
+- El despliegue integral requiere autorizar en el proyecto Apps Script a la cuenta activa de `clasp` o volver a autenticar `clasp` con una cuenta que tenga permisos de edicion y deployment.
+- Las fotografias huerfanas se reportan sin borrarlas ni reasignarlas automaticamente para preservar trazabilidad y evitar cambios irreversibles.
+
 ## 2026-08-02 - Actualizacion automatica y version visible v1.7.3
 
 ### Objetivo

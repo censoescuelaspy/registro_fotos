@@ -1,6 +1,6 @@
 # Bitacora
 
-## 2026-08-05 - Visibilidad remota y conciliacion registro-foto v1.8.0
+## 2026-08-05 07:05 - Visibilidad remota y conciliacion registro-foto v1.8.0
 
 ### Objetivo
 
@@ -30,14 +30,17 @@
 ### Validacion local
 
 - Pruebas focalizadas en Chrome escritorio y Pixel 7 simulado: `10/10` aprobadas.
-- Suite Playwright completa en Chrome escritorio y Pixel 7 simulado: `74/74` aprobadas.
+- Suite Playwright final en Chrome escritorio y Pixel 7 simulado: `76/76` aprobadas.
 - Sintaxis JavaScript, archivos JSON y `git diff --check`: aprobados sin errores.
 - Prueba de carga con 300 fotografias: aprobada en ambos perfiles, sin regresiones funcionales.
 
 ### Publicacion
 
 - `clasp push -f` fue intentado con la cuenta activa `monitorimpactosocial@gmail.com` y rechazado por Google con `The caller does not have permission`; el backend productivo permanece sin cambios.
-- Frontend `1.8.0`: pendiente de commit, push a `main` y verificacion de GitHub Pages.
+- Frontend `1.8.0` publicado en `main` mediante los commits `6ff92ef` y `a8e67b7`.
+- Workflow **Publicar GitHub Pages** `30995634931`: finalizado correctamente; `version.json`, configuracion, service worker y aplicacion publica responden con `1.8.0`.
+- Validacion visual en la URL publica: acceso y actualizacion demo, panel **Integridad registro–foto**, consola sin errores ni advertencias y viewport movil de 412 px sin desbordamiento horizontal.
+- Backend publico verificado como operativo, pero todavia en version `1.7.3` y esquema `2026-08-01.2`; no contiene aun las funciones de conciliacion de `1.8.0`.
 
 ### Riesgos y pendientes
 

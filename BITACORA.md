@@ -714,3 +714,14 @@ Recuperar para la app fotografica las capacidades operativas valiosas de la app 
 - Commit funcional `1002c20` publicado en `main`; workflow GitHub Pages `29661359216` finalizado correctamente.
 - Smoke test en `https://censoescuelaspy.github.io/registro_fotos/`: version `1.1.0`, backend en linea, sin advertencias ni errores de consola.
 - Vista movil publica verificada con 86 escuelas, 86 filas logisticas, pestañas administrativas operativas y sin desborde horizontal.
+
+## Cierre de despliegue 2026-08-05 09:20 -03 - v1.9.0
+
+- Commit funcional `52e5541` publicado en `main`.
+- Workflows `31004106044` (`Publicar GitHub Pages`) y `31004104881` (`pages build and deployment`) concluyeron con `success` para el mismo commit.
+- URL publica verificada en navegador real: `https://censoescuelaspy.github.io/registro_fotos/`, version visible `1.9.0`, estado `En linea` y sin errores JavaScript de consola.
+- `version.json` y `assets/js/config.js` publican `1.9.0` con fecha `2026-08-05`.
+- Deployment Apps Script estable confirmado por `clasp deployments` en `@27`.
+- Salud backend confirmada: `ok: true`, version `1.9.0`, esquema `2026-08-05.1` y `bootstrapRequired: false`.
+- Datos productivos reconfirmados despues de la escritura: 8 asignaciones activas, 8 equipos activos, 16 membresias activas y dos integrantes por equipo.
+- Estado final: codigo probado, frontend y backend desplegados, datos verificados; validacion autenticada y conformidad del usuario pendientes.
